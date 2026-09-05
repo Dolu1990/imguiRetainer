@@ -19,12 +19,12 @@ public:
     void end_window() override { ImGui::End(); }
 
     void text(std::string_view value, Rect bounds) override {
-        ImGui::SetCursorPos({bounds.x, bounds.y});
+        set_cursor_to_bounds(bounds);
         ImGui::TextUnformatted(value.data(), value.data() + value.size());
     }
 
     bool button(std::string_view label, Rect bounds, bool enabled) override {
-        ImGui::SetCursorPos({bounds.x, bounds.y});
+        set_cursor_to_bounds(bounds);
         if (!enabled) ImGui::BeginDisabled();
         const bool clicked = ImGui::Button(label.data(), {bounds.width, bounds.height});
         if (!enabled) ImGui::EndDisabled();
@@ -32,6 +32,15 @@ public:
     }
 
     ImGuiContext& imgui_context() noexcept override { return *ImGui::GetCurrentContext(); }
+
+private:
+    static void set_cursor_to_bounds(Rect bounds) {
+        // Retained coordinates start at the content area's top-left. ImGui's
+        // SetCursorPos instead uses the outer window coordinate system, whose
+        // origin lies behind a decorated window's title bar.
+        const ImVec2 content_origin = ImGui::GetCursorStartPos();
+        ImGui::SetCursorPos({content_origin.x + bounds.x, content_origin.y + bounds.y});
+    }
 };
 
 void render_node(Node& node, RenderContext& context) {

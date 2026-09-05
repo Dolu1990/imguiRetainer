@@ -56,7 +56,12 @@ void bind_lua(sol::state_view state) {
     state.new_usertype<Node>("rgui.Node", sol::no_constructor,
         "id", &Node::id,
         "visible", sol::property(&Node::visible, &Node::set_visible),
-        "enabled", sol::property(&Node::enabled, &Node::set_enabled));
+        "enabled", sol::property(&Node::enabled, &Node::set_enabled),
+        "set_preferred_size", [](Node& node, float width, float height) {
+            LayoutParams params = node.layout_params();
+            params.preferred = {width, height};
+            node.set_layout_params(params);
+        });
     state.new_usertype<Container>("rgui.Container", sol::no_constructor,
         sol::base_classes, sol::bases<Node>(),
         "append", [](Container& parent, const sol::object& child) { parent.append(node_from_lua(child)); },

@@ -58,6 +58,9 @@ int main() {
         local description = rgui.text("This retained UI was constructed and is updated by Lua.")
         local status = rgui.text("Button clicks: 0")
         local action = rgui.button("Increment")
+        description:set_preferred_size(440, 20)
+        status:set_preferred_size(440, 20)
+        action:set_preferred_size(110, 28)
         local clicks = 0
         action:on_click(function(button)
             clicks = clicks + 1
