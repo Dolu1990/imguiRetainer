@@ -12,7 +12,8 @@ public:
     [[nodiscard]] virtual ImGuiContext& imgui_context() noexcept = 0;
 };
 
-/// Renders the tree into the caller-owned current Dear ImGui frame/context.
+/// Renders a tree rooted in Window into the caller-owned current Dear ImGui
+/// frame/context. Throws std::logic_error for any other root type.
 void render(UiTree& tree);
 
 /// Measures unsized leaves with the active ImGui style, then lays out the tree.

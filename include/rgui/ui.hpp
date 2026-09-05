@@ -42,7 +42,8 @@ class RenderContext {
 public:
     virtual ~RenderContext() = default;
     virtual void render_child(Node& child) = 0;
-    [[nodiscard]] virtual bool begin_window(std::string_view title, Rect bounds) = 0;
+    /// `id` is the stable identity of this window, independent of its title.
+    [[nodiscard]] virtual bool begin_window(NodeId id, std::string_view title, Rect bounds) = 0;
     virtual void end_window() = 0;
     virtual void text(std::string_view value, Rect bounds) = 0;
     [[nodiscard]] virtual bool button(std::string_view label, Rect bounds, bool enabled) = 0;
@@ -74,6 +75,8 @@ public:
 
     void set_visible(bool value) noexcept;
     void set_enabled(bool value) noexcept;
+    /// Stores a normalized layout description: dimensions, margins, and grow
+    /// are non-negative, and each maximum is at least its minimum.
     void set_layout_params(LayoutParams value) noexcept;
     void invalidate(Dirty flags = Dirty::paint) noexcept;
     virtual void clear_dirty_recursive() noexcept;

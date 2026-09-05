@@ -113,7 +113,10 @@ that later widgets and Lua bindings must follow.
   cross-axis alignment) and `Overlay`. Exact text/font measurement is not a
   core concern; the game or rendering adapter may set suitable preferred sizes.
 - `Text` and `Button` are the initial leaves. A button callback receives the
-  button and only runs when the node is visible and enabled.
+  button and only runs when the node is visible and enabled. Structural tree
+  mutation (`append`, `remove`, or `clear`) during rendering/event dispatch is
+  unsupported until queued mutations are designed; applications must defer it
+  until after the render pass.
 - Rendering is virtual through a renderer-neutral `RenderContext`; the backend
   has no closed type switch for built-in widgets. Applications
   can add `Node` subclasses and compose context operations. The ImGui adapter
@@ -126,7 +129,9 @@ the embedding build to pass an existing `RGUI_IMGUI_TARGET`; rgui never fetches
 or creates that dependency. The adapter renders into the caller-owned current
 ImGui frame. It uses node IDs, calls `End` after every `Begin`, and leaves frame
 creation, context ownership, platform integration, and `ImGui::Render` to the
-game. A retained `Window`'s bounds describe its content rectangle; the adapter
+game. Its root must be a retained `Window`; a renderer-neutral tree can still
+use another root type with a different adapter. A retained `Window`'s bounds
+describe its content rectangle; the adapter
 converts that into an ImGui outer-window size. Nested retained windows preserve
 their parent-relative coordinate origin.
 

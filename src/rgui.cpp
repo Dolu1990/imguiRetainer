@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <stdexcept>
 
 namespace rgui {
@@ -21,6 +22,25 @@ float clamp(float value, float minimum, float maximum) noexcept {
 Size clamp_size(Size value, const LayoutParams& params) noexcept {
     return {clamp(value.width, params.minimum.width, params.maximum.width),
             clamp(value.height, params.minimum.height, params.maximum.height)};
+}
+
+float non_negative_finite(float value) noexcept {
+    return std::isfinite(value) && value > 0.0F ? value : 0.0F;
+}
+
+LayoutParams normalize_layout_params(LayoutParams value) noexcept {
+    value.preferred = {non_negative_finite(value.preferred.width),
+                       non_negative_finite(value.preferred.height)};
+    value.minimum = {non_negative_finite(value.minimum.width),
+                     non_negative_finite(value.minimum.height)};
+    value.maximum = {
+        std::max(value.minimum.width, non_negative_finite(value.maximum.width)),
+        std::max(value.minimum.height, non_negative_finite(value.maximum.height)),
+    };
+    value.margin = {non_negative_finite(value.margin.left), non_negative_finite(value.margin.top),
+                    non_negative_finite(value.margin.right), non_negative_finite(value.margin.bottom)};
+    value.grow = non_negative_finite(value.grow);
+    return value;
 }
 
 float primary(Size size, Axis axis) noexcept {
@@ -44,9 +64,9 @@ void Node::set_enabled(bool value) noexcept {
 }
 
 void Node::set_layout_params(LayoutParams value) noexcept {
-    layout_ = value;
-    automatic_preferred_width_ = value.preferred.width == 0.0F;
-    automatic_preferred_height_ = value.preferred.height == 0.0F;
+    layout_ = normalize_layout_params(value);
+    automatic_preferred_width_ = layout_.preferred.width == 0.0F;
+    automatic_preferred_height_ = layout_.preferred.height == 0.0F;
     invalidate(Dirty::layout);
 }
 
@@ -122,7 +142,10 @@ void Container::render(RenderContext& context) {
 }
 
 void Stack::set_axis(Axis value) noexcept { if (axis_ != value) { axis_ = value; invalidate(Dirty::layout); } }
-void Stack::set_gap(float value) noexcept { if (gap_ != value) { gap_ = std::max(0.0F, value); invalidate(Dirty::layout); } }
+void Stack::set_gap(float value) noexcept {
+    value = non_negative_finite(value);
+    if (gap_ != value) { gap_ = value; invalidate(Dirty::layout); }
+}
 void Stack::set_align(Align value) noexcept { if (align_ != value) { align_ = value; invalidate(Dirty::layout); } }
 
 Size Stack::measure(Size available) const noexcept {
@@ -202,8 +225,9 @@ void Stack::arrange(Rect bounds) noexcept {
         const float before_cross = axis_ == Axis::horizontal ? m.top : m.left;
         const float after_cross = axis_ == Axis::horizontal ? m.bottom : m.right;
         const float natural_cross = cross(desired, axis_);
-        float child_cross = align_ == Align::stretch ? std::max(0.0F, available_cross - before_cross - after_cross) : natural_cross;
-        child_cross = std::min(child_cross, std::max(0.0F, available_cross - before_cross - after_cross));
+        const float cross_limit = std::max(0.0F, available_cross - before_cross - after_cross);
+        float child_cross = align_ == Align::stretch ? cross_limit : natural_cross;
+        child_cross = std::min({child_cross, cross_limit, cross(p.maximum, axis_)});
         float cross_position = (axis_ == Axis::horizontal ? bounds.y : bounds.x) + before_cross;
         const float slack = std::max(0.0F, available_cross - before_cross - after_cross - child_cross);
         if (align_ == Align::center) cross_position += slack / 2.0F;
@@ -244,7 +268,7 @@ void Overlay::arrange(Rect bounds) noexcept {
 Window::Window(std::string title) : title_(std::move(title)) {}
 void Window::set_title(std::string_view value) { title_ = value; invalidate(Dirty::paint); }
 void Window::render(RenderContext& context) {
-    const bool render_contents = context.begin_window(title_, bounds());
+    const bool render_contents = context.begin_window(id(), title_, bounds());
     if (render_contents) Container::render(context);
     context.end_window();
 }

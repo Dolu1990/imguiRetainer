@@ -2,6 +2,7 @@
 
 #include <imgui.h>
 
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -12,8 +13,11 @@ class Context final : public ImGuiRenderContext {
 public:
     void render_child(Node& child) override;
 
-    bool begin_window(std::string_view title, Rect bounds) override {
-        const std::string title_copy{title};
+    bool begin_window(NodeId id, std::string_view title, Rect bounds) override {
+        // ImGui identifies windows from the string passed to Begin, outside of
+        // the regular PushID stack. Keep the human-visible title while making
+        // retained-window identity stable and independent of that title.
+        const std::string title_copy = std::string{title} + "###rgui-" + std::to_string(id);
         const ImGuiStyle& style = ImGui::GetStyle();
         const float border = style.WindowBorderSize;
         // Core window bounds describe the content rectangle. Dear ImGui sizes
@@ -99,6 +103,9 @@ void Context::render_child(Node& child) { render_node(child, *this); }
 void render(UiTree& tree) {
     const NodePtr& root = tree.root();
     if (!root || !root->visible()) return;
+    if (dynamic_cast<Window*>(root.get()) == nullptr) {
+        throw std::logic_error("rgui ImGui rendering requires a Window root");
+    }
     Context context;
     render_node(*root, context);
 }

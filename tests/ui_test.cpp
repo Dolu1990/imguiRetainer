@@ -14,7 +14,10 @@ void expect(bool condition) { if (!condition) ++failures; }
 class RecordingContext final : public rgui::RenderContext {
 public:
     void render_child(rgui::Node& child) override { child.render(*this); }
-    bool begin_window(std::string_view, rgui::Rect) override { return true; }
+    bool begin_window(rgui::NodeId id, std::string_view, rgui::Rect) override {
+        begun_window_id = id;
+        return true;
+    }
     void end_window() override {}
     void text(std::string_view value, rgui::Rect) override { rendered_text = value; }
     bool button(std::string_view label, rgui::Rect, bool enabled) override {
@@ -23,6 +26,7 @@ public:
     }
 
     bool click_next_button = false;
+    rgui::NodeId begun_window_id = 0;
     std::string rendered_text;
     std::string rendered_button;
 };
@@ -83,6 +87,10 @@ int main() {
     expect(context.rendered_button == "first");
     expect(activated);
 
+    auto window = std::make_shared<rgui::Window>("test window");
+    window->render(context);
+    expect(context.begun_window_id == window->id());
+
     const rgui::NodePtr detached = root->remove(*second);
     expect(detached.get() == second.get());
     expect(second->parent() == nullptr);
@@ -138,5 +146,30 @@ int main() {
     overlay_tree.layout({100.0F, 100.0F});
     expect(equal(overlay_child->bounds().x, 2.0F));
     expect(equal(overlay_child->bounds().y, 3.0F));
+
+    auto stretched = std::make_shared<rgui::Stack>(rgui::Axis::horizontal);
+    stretched->set_align(rgui::Align::stretch);
+    auto maximum_height = std::make_shared<rgui::Text>("limited");
+    maximum_height->set_layout_params({.preferred = {10.0F, 10.0F}, .maximum = {20.0F, 15.0F}});
+    stretched->append(maximum_height);
+    rgui::UiTree stretch_tree;
+    stretch_tree.set_root(stretched);
+    stretch_tree.layout({100.0F, 100.0F});
+    expect(equal(maximum_height->bounds().height, 15.0F));
+
+    rgui::LayoutParams invalid_params{};
+    invalid_params.minimum = {-1.0F, 10.0F};
+    invalid_params.maximum = {5.0F, -2.0F};
+    invalid_params.margin = {-1.0F, 2.0F, -3.0F, 4.0F};
+    invalid_params.grow = -1.0F;
+    maximum_height->set_layout_params(invalid_params);
+    const rgui::LayoutParams& normalized = maximum_height->layout_params();
+    expect(equal(normalized.minimum.width, 0.0F));
+    expect(equal(normalized.minimum.height, 10.0F));
+    expect(equal(normalized.maximum.width, 5.0F));
+    expect(equal(normalized.maximum.height, 10.0F));
+    expect(equal(normalized.margin.left, 0.0F));
+    expect(equal(normalized.margin.right, 0.0F));
+    expect(equal(normalized.grow, 0.0F));
     return failures == 0 ? 0 : 1;
 }
