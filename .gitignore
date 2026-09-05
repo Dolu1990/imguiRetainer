@@ -1,0 +1,20 @@
+# CMake build trees
+/build/
+/out/
+/cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+CTestTestfile.cmake
+Testing/
+compile_commands.json
+
+# IDEs and editors
+.idea/
+.vscode/
+*.user
+*.suo
+*.vcxproj*
+
+# Platform files
+.DS_Store
+Thumbs.db

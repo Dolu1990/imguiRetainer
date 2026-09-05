@@ -1,0 +1,4 @@
+add_executable(imguiRetainer_version_test version_test.cpp)
+target_link_libraries(imguiRetainer_version_test PRIVATE imguiRetainer::imguiRetainer)
+
+add_test(NAME imguiRetainer.version COMMAND imguiRetainer_version_test)

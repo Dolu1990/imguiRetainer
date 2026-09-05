@@ -1,0 +1,2 @@
+add_executable(imguiRetainer_hello hello.cpp)
+target_link_libraries(imguiRetainer_hello PRIVATE imguiRetainer::imguiRetainer)
