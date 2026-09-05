@@ -7,6 +7,11 @@ and whose scripting adapter targets Lua through sol2. Keep the core UI model
 independent of both adapters so a game engine can own its ImGui context, Lua
 state, allocator, and dependency versions.
 
+The current implementation state, third-party dependency roles, verified build
+commands, and unresolved architecture decisions are recorded in
+`docs/architecture.md`. Read that document before changing the public API or
+adding ImGui/Lua integration targets.
+
 ## Build checks
 
 Run these after a source or CMake change:

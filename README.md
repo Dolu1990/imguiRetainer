@@ -79,5 +79,6 @@ Or add this directory with `add_subdirectory` and link the same target.
 - `tests/` — CTest tests without an external test framework
 - `cmake/` — install-package support
 
-See [AGENTS.md](AGENTS.md) for development conventions and the planned ImGui /
-Lua integration boundaries.
+See [AGENTS.md](AGENTS.md) for development conventions and
+[docs/architecture.md](docs/architecture.md) for the preserved project context,
+dependency roles, and the retainer-mode architecture discussion checklist.
