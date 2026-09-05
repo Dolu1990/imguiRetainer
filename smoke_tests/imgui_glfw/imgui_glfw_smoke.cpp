@@ -120,7 +120,7 @@ int main() {
         // Layout can be skipped when no layout-affecting property changed;
         // this compact example runs it every frame to keep the smoke test
         // straightforward and to exercise the retained layout path.
-        tree.layout({420.0F, 120.0F});
+        rgui::imgui_backend::layout(tree, {420.0F, 120.0F});
         rgui::imgui_backend::render(tree);
 
         ImGui::Render();

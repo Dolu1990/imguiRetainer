@@ -34,6 +34,7 @@ struct LayoutParams {
 class Container;
 class Node;
 class RenderContext;
+class LayoutContext;
 using NodePtr = std::shared_ptr<Node>;
 
 /// Renderer-neutral operations used by retained nodes during a render pass.
@@ -45,6 +46,14 @@ public:
     virtual void end_window() = 0;
     virtual void text(std::string_view value, Rect bounds) = 0;
     [[nodiscard]] virtual bool button(std::string_view label, Rect bounds, bool enabled) = 0;
+};
+
+/// Renderer-supplied intrinsic measurements for nodes without a preferred size.
+class LayoutContext {
+public:
+    virtual ~LayoutContext() = default;
+    [[nodiscard]] virtual Size measure_text(std::string_view value) = 0;
+    [[nodiscard]] virtual Size measure_button(std::string_view label) = 0;
 };
 
 /// A retained UI node. Nodes have one owning parent at most.
@@ -68,6 +77,7 @@ public:
     void set_layout_params(LayoutParams value) noexcept;
     void invalidate(Dirty flags = Dirty::paint) noexcept;
     virtual void clear_dirty_recursive() noexcept;
+    virtual void apply_default_layout(LayoutContext& context);
 
     [[nodiscard]] virtual Size measure(Size available) const noexcept;
     virtual void arrange(Rect bounds) noexcept;
@@ -92,6 +102,7 @@ public:
     void clear();
     [[nodiscard]] const std::vector<NodePtr>& children() const noexcept { return children_; }
     void clear_dirty_recursive() noexcept override;
+    void apply_default_layout(LayoutContext& context) override;
     void render(RenderContext& context) override;
 
 protected:
@@ -142,6 +153,7 @@ public:
     explicit Text(std::string value = {});
     [[nodiscard]] std::string_view value() const noexcept { return value_; }
     void set_value(std::string_view value);
+    void apply_default_layout(LayoutContext& context) override;
     void render(RenderContext& context) override;
 private:
     std::string value_;
@@ -154,6 +166,7 @@ public:
     void set_label(std::string_view value);
     void set_on_click(std::function<void(Button&)> callback);
     void activate();
+    void apply_default_layout(LayoutContext& context) override;
     void render(RenderContext& context) override;
 private:
     std::string label_;
@@ -165,6 +178,7 @@ class UiTree final {
 public:
     void set_root(NodePtr root);
     [[nodiscard]] const NodePtr& root() const noexcept { return root_; }
+    void apply_default_layout(LayoutContext& context);
     void layout(Size available) noexcept;
 private:
     NodePtr root_;

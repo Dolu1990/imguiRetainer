@@ -27,6 +27,17 @@ public:
     std::string rendered_button;
 };
 
+class MeasuringContext final : public rgui::LayoutContext {
+public:
+    rgui::Size measure_text(std::string_view value) override {
+        return {static_cast<float>(value.size() * 10), 16.0F};
+    }
+
+    rgui::Size measure_button(std::string_view label) override {
+        return {static_cast<float>(label.size() * 10 + 16), 24.0F};
+    }
+};
+
 class CustomNode final : public rgui::Node {
 public:
     void render(rgui::RenderContext& context) override { context.text("custom node", bounds()); }
@@ -82,5 +93,20 @@ int main() {
         rejected_multiple_parent = true;
     }
     expect(rejected_multiple_parent);
+
+    auto automatic_layout = std::make_shared<rgui::Stack>();
+    auto automatic_text = std::make_shared<rgui::Text>("text");
+    auto automatic_button = std::make_shared<rgui::Button>("go");
+    automatic_layout->append(automatic_text);
+    automatic_layout->append(automatic_button);
+    rgui::UiTree automatic_tree;
+    automatic_tree.set_root(automatic_layout);
+    MeasuringContext measuring_context;
+    automatic_tree.apply_default_layout(measuring_context);
+    automatic_tree.layout({100.0F, 100.0F});
+    expect(equal(automatic_text->layout_params().preferred.width, 40.0F));
+    expect(equal(automatic_text->layout_params().preferred.height, 16.0F));
+    expect(equal(automatic_button->layout_params().preferred.width, 36.0F));
+    expect(equal(automatic_button->bounds().y, 16.0F));
     return failures == 0 ? 0 : 1;
 }

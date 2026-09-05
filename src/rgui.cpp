@@ -55,6 +55,8 @@ void Node::invalidate(Dirty flags) noexcept {
 
 void Node::clear_dirty_recursive() noexcept { dirty_ = Dirty::none; }
 
+void Node::apply_default_layout(LayoutContext&) {}
+
 Size Node::measure(Size) const noexcept { return clamp_size(layout_.preferred, layout_); }
 
 void Node::arrange(Rect bounds) noexcept { bounds_ = bounds; }
@@ -94,6 +96,10 @@ void Container::clear() {
 void Container::clear_dirty_recursive() noexcept {
     Node::clear_dirty_recursive();
     for (const NodePtr& child : children_) child->clear_dirty_recursive();
+}
+
+void Container::apply_default_layout(LayoutContext& context) {
+    for (const NodePtr& child : children_) child->apply_default_layout(context);
 }
 
 void Container::render(RenderContext& context) {
@@ -193,11 +199,39 @@ void Window::render(RenderContext& context) {
 }
 Text::Text(std::string value) : value_(std::move(value)) {}
 void Text::set_value(std::string_view value) { value_ = value; invalidate(Dirty::paint | Dirty::layout); }
+void Text::apply_default_layout(LayoutContext& context) {
+    const Size measured = context.measure_text(value_);
+    LayoutParams params = layout_params();
+    bool changed = false;
+    if (params.preferred.width == 0.0F && measured.width > 0.0F) {
+        params.preferred.width = measured.width;
+        changed = true;
+    }
+    if (params.preferred.height == 0.0F && measured.height > 0.0F) {
+        params.preferred.height = measured.height;
+        changed = true;
+    }
+    if (changed) set_layout_params(params);
+}
 void Text::render(RenderContext& context) { context.text(value_, bounds()); }
 Button::Button(std::string label) : label_(std::move(label)) {}
 void Button::set_label(std::string_view value) { label_ = value; invalidate(Dirty::paint | Dirty::layout); }
 void Button::set_on_click(std::function<void(Button&)> callback) { on_click_ = std::move(callback); }
 void Button::activate() { if (visible() && enabled() && on_click_) on_click_(*this); }
+void Button::apply_default_layout(LayoutContext& context) {
+    const Size measured = context.measure_button(label_);
+    LayoutParams params = layout_params();
+    bool changed = false;
+    if (params.preferred.width == 0.0F && measured.width > 0.0F) {
+        params.preferred.width = measured.width;
+        changed = true;
+    }
+    if (params.preferred.height == 0.0F && measured.height > 0.0F) {
+        params.preferred.height = measured.height;
+        changed = true;
+    }
+    if (changed) set_layout_params(params);
+}
 void Button::render(RenderContext& context) {
     if (context.button(label_, bounds(), enabled())) activate();
 }
@@ -205,6 +239,10 @@ void Button::render(RenderContext& context) {
 void UiTree::set_root(NodePtr root) {
     if (root && root->parent() != nullptr) throw std::logic_error("rgui root already has a parent");
     root_ = std::move(root);
+}
+
+void UiTree::apply_default_layout(LayoutContext& context) {
+    if (root_) root_->apply_default_layout(context);
 }
 
 void UiTree::layout(Size available) noexcept {

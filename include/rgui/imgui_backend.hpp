@@ -15,4 +15,7 @@ public:
 /// Renders the tree into the caller-owned current Dear ImGui frame/context.
 void render(UiTree& tree);
 
+/// Measures unsized leaves with the active ImGui style, then lays out the tree.
+void layout(UiTree& tree, Size available);
+
 } // namespace rgui::imgui_backend

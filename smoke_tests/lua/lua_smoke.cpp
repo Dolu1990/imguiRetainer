@@ -58,9 +58,6 @@ int main() {
         local description = rgui.text("This retained UI was constructed and is updated by Lua.")
         local status = rgui.text("Button clicks: 0")
         local action = rgui.button("Increment")
-        description:set_preferred_size(440, 20)
-        status:set_preferred_size(440, 20)
-        action:set_preferred_size(110, 28)
         local clicks = 0
         action:on_click(function(button)
             clicks = clicks + 1
@@ -91,7 +88,7 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        tree.layout({480.0F, 140.0F});
+        rgui::imgui_backend::layout(tree, {480.0F, 140.0F});
         rgui::imgui_backend::render(tree);
 
         ImGui::Render();

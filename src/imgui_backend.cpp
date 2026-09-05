@@ -43,6 +43,20 @@ private:
     }
 };
 
+class ImGuiLayoutContext final : public LayoutContext {
+public:
+    Size measure_text(std::string_view value) override {
+        const ImVec2 size = ImGui::CalcTextSize(value.data(), value.data() + value.size());
+        return {size.x, size.y};
+    }
+
+    Size measure_button(std::string_view label) override {
+        const ImVec2 label_size = ImGui::CalcTextSize(label.data(), label.data() + label.size());
+        const ImVec2 padding = ImGui::GetStyle().FramePadding;
+        return {label_size.x + 2.0F * padding.x, ImGui::GetFrameHeight()};
+    }
+};
+
 void render_node(Node& node, RenderContext& context) {
     if (!node.visible()) return;
     ImGui::PushID(std::to_string(node.id()).c_str());
@@ -59,6 +73,12 @@ void render(UiTree& tree) {
     if (!root || !root->visible()) return;
     Context context;
     render_node(*root, context);
+}
+
+void layout(UiTree& tree, Size available) {
+    ImGuiLayoutContext context;
+    tree.apply_default_layout(context);
+    tree.layout(available);
 }
 
 } // namespace rgui::imgui_backend
