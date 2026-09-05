@@ -11,6 +11,27 @@ bool equal(float left, float right) { return std::fabs(left - right) < 0.001F; }
 int failures = 0;
 void expect(bool condition) { if (!condition) ++failures; }
 
+class RecordingContext final : public rgui::RenderContext {
+public:
+    void render_child(rgui::Node& child) override { child.render(*this); }
+    bool begin_window(std::string_view) override { return true; }
+    void end_window() override {}
+    void text(std::string_view value, rgui::Rect) override { rendered_text = value; }
+    bool button(std::string_view label, rgui::Rect, bool enabled) override {
+        rendered_button = label;
+        return enabled && click_next_button;
+    }
+
+    bool click_next_button = false;
+    std::string rendered_text;
+    std::string rendered_button;
+};
+
+class CustomNode final : public rgui::Node {
+public:
+    void render(rgui::RenderContext& context) override { context.text("custom node", bounds()); }
+};
+
 } // namespace
 
 int main() {
@@ -40,6 +61,16 @@ int main() {
     first->set_enabled(false);
     first->activate();
     expect(!activated);
+
+    RecordingContext context;
+    CustomNode custom;
+    custom.render(context);
+    expect(context.rendered_text == "custom node");
+    first->set_enabled(true);
+    context.click_next_button = true;
+    first->render(context);
+    expect(context.rendered_button == "first");
+    expect(activated);
 
     const rgui::NodePtr detached = root->remove(*second);
     expect(detached.get() == second.get());

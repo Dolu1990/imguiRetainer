@@ -107,6 +107,11 @@ that later widgets and Lua bindings must follow.
   core concern; the game or rendering adapter may set suitable preferred sizes.
 - `Text` and `Button` are the initial leaves. A button callback receives the
   button and only runs when the node is visible and enabled.
+- Rendering is virtual through a renderer-neutral `RenderContext`; the backend
+  has no closed type switch for built-in widgets. Applications
+  can add `Node` subclasses and compose context operations. The ImGui adapter
+  also supplies an `ImGuiRenderContext` extension for deliberately
+  ImGui-specific custom nodes; such nodes include `imgui.h` themselves.
 
 The core API includes no Dear ImGui, sol2, or Lua headers. The optional
 `rgui::imgui` target is enabled with `RGUI_BUILD_IMGUI_BACKEND=ON` and requires

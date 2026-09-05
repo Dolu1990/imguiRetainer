@@ -33,7 +33,19 @@ struct LayoutParams {
 
 class Container;
 class Node;
+class RenderContext;
 using NodePtr = std::shared_ptr<Node>;
+
+/// Renderer-neutral operations used by retained nodes during a render pass.
+class RenderContext {
+public:
+    virtual ~RenderContext() = default;
+    virtual void render_child(Node& child) = 0;
+    [[nodiscard]] virtual bool begin_window(std::string_view title) = 0;
+    virtual void end_window() = 0;
+    virtual void text(std::string_view value, Rect bounds) = 0;
+    [[nodiscard]] virtual bool button(std::string_view label, Rect bounds, bool enabled) = 0;
+};
 
 /// A retained UI node. Nodes have one owning parent at most.
 class Node {
@@ -59,6 +71,7 @@ public:
 
     [[nodiscard]] virtual Size measure(Size available) const noexcept;
     virtual void arrange(Rect bounds) noexcept;
+    virtual void render(RenderContext& context) = 0;
 
 private:
     friend class Container;
@@ -79,6 +92,7 @@ public:
     void clear();
     [[nodiscard]] const std::vector<NodePtr>& children() const noexcept { return children_; }
     void clear_dirty_recursive() noexcept override;
+    void render(RenderContext& context) override;
 
 protected:
     std::vector<NodePtr> children_;
@@ -118,6 +132,7 @@ public:
     explicit Window(std::string title = {});
     [[nodiscard]] std::string_view title() const noexcept { return title_; }
     void set_title(std::string_view value);
+    void render(RenderContext& context) override;
 private:
     std::string title_;
 };
@@ -127,6 +142,7 @@ public:
     explicit Text(std::string value = {});
     [[nodiscard]] std::string_view value() const noexcept { return value_; }
     void set_value(std::string_view value);
+    void render(RenderContext& context) override;
 private:
     std::string value_;
 };
@@ -138,6 +154,7 @@ public:
     void set_label(std::string_view value);
     void set_on_click(std::function<void(Button&)> callback);
     void activate();
+    void render(RenderContext& context) override;
 private:
     std::string label_;
     std::function<void(Button&)> on_click_;

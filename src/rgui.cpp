@@ -96,6 +96,10 @@ void Container::clear_dirty_recursive() noexcept {
     for (const NodePtr& child : children_) child->clear_dirty_recursive();
 }
 
+void Container::render(RenderContext& context) {
+    for (const NodePtr& child : children_) context.render_child(*child);
+}
+
 void Stack::set_axis(Axis value) noexcept { if (axis_ != value) { axis_ = value; invalidate(Dirty::layout); } }
 void Stack::set_gap(float value) noexcept { if (gap_ != value) { gap_ = std::max(0.0F, value); invalidate(Dirty::layout); } }
 void Stack::set_align(Align value) noexcept { if (align_ != value) { align_ = value; invalidate(Dirty::layout); } }
@@ -182,12 +186,21 @@ void Overlay::arrange(Rect bounds) noexcept {
 
 Window::Window(std::string title) : title_(std::move(title)) {}
 void Window::set_title(std::string_view value) { title_ = value; invalidate(Dirty::paint); }
+void Window::render(RenderContext& context) {
+    const bool render_contents = context.begin_window(title_);
+    if (render_contents) Container::render(context);
+    context.end_window();
+}
 Text::Text(std::string value) : value_(std::move(value)) {}
 void Text::set_value(std::string_view value) { value_ = value; invalidate(Dirty::paint | Dirty::layout); }
+void Text::render(RenderContext& context) { context.text(value_, bounds()); }
 Button::Button(std::string label) : label_(std::move(label)) {}
 void Button::set_label(std::string_view value) { label_ = value; invalidate(Dirty::paint | Dirty::layout); }
 void Button::set_on_click(std::function<void(Button&)> callback) { on_click_ = std::move(callback); }
 void Button::activate() { if (visible() && enabled() && on_click_) on_click_(*this); }
+void Button::render(RenderContext& context) {
+    if (context.button(label_, bounds(), enabled())) activate();
+}
 
 void UiTree::set_root(NodePtr root) {
     if (root && root->parent() != nullptr) throw std::logic_error("rgui root already has a parent");

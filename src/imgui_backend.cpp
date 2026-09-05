@@ -7,40 +7,49 @@
 namespace rgui::imgui_backend {
 namespace {
 
-void render_node(Node& node) {
-    if (!node.visible()) return;
+class Context final : public ImGuiRenderContext {
+public:
+    void render_child(Node& child) override;
 
-    ImGui::PushID(std::to_string(node.id()).c_str());
-    if (auto* button = dynamic_cast<Button*>(&node)) {
-        const Rect& r = button->bounds();
-        ImGui::SetCursorPos({r.x, r.y});
-        if (!button->enabled()) ImGui::BeginDisabled();
-        if (ImGui::Button(button->label().data(), {r.width, r.height})) button->activate();
-        if (!button->enabled()) ImGui::EndDisabled();
-    } else if (auto* text = dynamic_cast<Text*>(&node)) {
-        const Rect& r = text->bounds();
-        ImGui::SetCursorPos({r.x, r.y});
-        ImGui::TextUnformatted(text->value().data(), text->value().data() + text->value().size());
-    } else if (auto* container = dynamic_cast<Container*>(&node)) {
-        for (const NodePtr& child : container->children()) render_node(*child);
+    bool begin_window(std::string_view title) override {
+        const std::string title_copy{title};
+        return ImGui::Begin(title_copy.c_str());
     }
+
+    void end_window() override { ImGui::End(); }
+
+    void text(std::string_view value, Rect bounds) override {
+        ImGui::SetCursorPos({bounds.x, bounds.y});
+        ImGui::TextUnformatted(value.data(), value.data() + value.size());
+    }
+
+    bool button(std::string_view label, Rect bounds, bool enabled) override {
+        ImGui::SetCursorPos({bounds.x, bounds.y});
+        if (!enabled) ImGui::BeginDisabled();
+        const bool clicked = ImGui::Button(label.data(), {bounds.width, bounds.height});
+        if (!enabled) ImGui::EndDisabled();
+        return clicked && enabled;
+    }
+
+    ImGuiContext& imgui_context() noexcept override { return *ImGui::GetCurrentContext(); }
+};
+
+void render_node(Node& node, RenderContext& context) {
+    if (!node.visible()) return;
+    ImGui::PushID(std::to_string(node.id()).c_str());
+    node.render(context);
     ImGui::PopID();
 }
+
+void Context::render_child(Node& child) { render_node(child, *this); }
 
 } // namespace
 
 void render(UiTree& tree) {
     const NodePtr& root = tree.root();
     if (!root || !root->visible()) return;
-    if (auto* window = dynamic_cast<Window*>(root.get())) {
-        const bool render_contents = ImGui::Begin(window->title().data());
-        if (render_contents) {
-            for (const NodePtr& child : window->children()) render_node(*child);
-        }
-        ImGui::End();
-        return;
-    }
-    render_node(*root);
+    Context context;
+    render_node(*root, context);
 }
 
 } // namespace rgui::imgui_backend
