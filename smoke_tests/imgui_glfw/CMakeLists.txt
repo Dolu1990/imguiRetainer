@@ -36,18 +36,19 @@ endif()
 
 find_package(OpenGL REQUIRED)
 
-add_library(rgui_imgui STATIC
+add_library(rgui_imgui_vendor STATIC
     "${RGUI_IMGUI_SOURCE_DIR}/imgui.cpp"
     "${RGUI_IMGUI_SOURCE_DIR}/imgui_draw.cpp"
     "${RGUI_IMGUI_SOURCE_DIR}/imgui_tables.cpp"
     "${RGUI_IMGUI_SOURCE_DIR}/imgui_widgets.cpp"
 )
-target_compile_features(rgui_imgui PUBLIC cxx_std_23)
-target_include_directories(rgui_imgui PUBLIC
+target_compile_features(rgui_imgui_vendor PUBLIC cxx_std_23)
+target_include_directories(rgui_imgui_vendor PUBLIC
     "${RGUI_IMGUI_SOURCE_DIR}")
 
 add_executable(rgui_imgui_smoke
     imgui_glfw_smoke.cpp
+    "${PROJECT_SOURCE_DIR}/src/imgui_backend.cpp"
     "${RGUI_IMGUI_SOURCE_DIR}/backends/imgui_impl_glfw.cpp"
     "${RGUI_IMGUI_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp"
 )
@@ -57,7 +58,7 @@ target_include_directories(rgui_imgui_smoke PRIVATE
     "${RGUI_IMGUI_SOURCE_DIR}/backends")
 target_link_libraries(rgui_imgui_smoke PRIVATE
     rgui::rgui
-    rgui_imgui
+    rgui_imgui_vendor
     ${rgui_glfw_target}
     OpenGL::GL)
 

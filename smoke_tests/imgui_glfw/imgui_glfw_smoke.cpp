@@ -2,9 +2,13 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
+#include <rgui/imgui_backend.hpp>
+
 #include <GLFW/glfw3.h>
 
 #include <iostream>
+#include <memory>
+#include <string>
 
 namespace {
 
@@ -47,26 +51,58 @@ int main() {
     ImGui_ImplOpenGL3_Init("#version 130");
 
     int clicks = 0;
-    bool toggle = false;
+
+    // The application owns the retained tree and its state. The ImGui adapter
+    // only emits the current tree into the caller-owned ImGui frame.
+    auto ui_window = std::make_shared<rgui::Window>("Retained rgui");
+    ui_window->set_gap(10.0F);
+
+    auto description = std::make_shared<rgui::Text>(
+        "This window is built from a retained rgui tree.");
+    description->set_layout_params({.preferred = {400.0F, 20.0F}});
+
+    auto controls = std::make_shared<rgui::Stack>(rgui::Axis::horizontal);
+    controls->set_gap(8.0F);
+    auto increment = std::make_shared<rgui::Button>("Increment");
+    auto reset = std::make_shared<rgui::Button>("Reset");
+    increment->set_layout_params({.preferred = {110.0F, 28.0F}});
+    reset->set_layout_params({.preferred = {80.0F, 28.0F}});
+
+    auto status = std::make_shared<rgui::Text>();
+    status->set_layout_params({.preferred = {400.0F, 20.0F}});
+    const auto update_status = [&] {
+        status->set_value("Button clicks: " + std::to_string(clicks));
+    };
+    increment->set_on_click([&](rgui::Button&) {
+        ++clicks;
+        update_status();
+    });
+    reset->set_on_click([&](rgui::Button&) {
+        clicks = 0;
+        update_status();
+    });
+    update_status();
+
+    controls->append(increment);
+    controls->append(reset);
+    ui_window->append(description);
+    ui_window->append(controls);
+    ui_window->append(status);
+
+    rgui::UiTree tree;
+    tree.set_root(ui_window);
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::Begin("Immediate-mode ImGui");
-        ImGui::TextUnformatted("This target is a rendering smoke test.");
-        if (ImGui::Button("Increment")) {
-            ++clicks;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Reset")) {
-            clicks = 0;
-        }
-        ImGui::Checkbox("Toggle state", &toggle);
-        ImGui::Text("Button clicks: %d", clicks);
-        ImGui::Text("Toggle is %s", toggle ? "on" : "off");
-        ImGui::End();
+        // Layout can be skipped when no layout-affecting property changed;
+        // this compact example runs it every frame to keep the smoke test
+        // straightforward and to exercise the retained layout path.
+        tree.layout({420.0F, 120.0F});
+        rgui::imgui_backend::render(tree);
 
         ImGui::Render();
         int framebuffer_width = 0;

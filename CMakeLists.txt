@@ -10,6 +10,10 @@ option(RGUI_BUILD_EXAMPLES "Build rgui examples" ON)
 option(RGUI_BUILD_TESTS "Build rgui tests" ON)
 option(RGUI_BUILD_IMGUI_SMOKE_TEST
     "Build the Dear ImGui + GLFW immediate-mode smoke-test application" OFF)
+option(RGUI_BUILD_IMGUI_BACKEND
+    "Build the optional Dear ImGui rendering adapter" OFF)
+set(RGUI_IMGUI_TARGET "" CACHE STRING
+    "Imported/normal CMake target that provides Dear ImGui (for example imgui::imgui)")
 
 add_library(rgui src/rgui.cpp)
 add_library(rgui::rgui ALIAS rgui)
@@ -20,6 +24,25 @@ target_include_directories(rgui
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
 )
+
+if(RGUI_BUILD_IMGUI_BACKEND)
+    if(NOT RGUI_IMGUI_TARGET)
+        message(FATAL_ERROR
+            "RGUI_BUILD_IMGUI_BACKEND requires RGUI_IMGUI_TARGET; rgui does not acquire Dear ImGui itself.")
+    endif()
+    if(NOT TARGET ${RGUI_IMGUI_TARGET})
+        message(FATAL_ERROR "RGUI_IMGUI_TARGET '${RGUI_IMGUI_TARGET}' is not a CMake target.")
+    endif()
+
+    add_library(rgui_imgui src/imgui_backend.cpp)
+    add_library(rgui::imgui ALIAS rgui_imgui)
+    target_compile_features(rgui_imgui PUBLIC cxx_std_23)
+    target_link_libraries(rgui_imgui PUBLIC rgui::rgui PRIVATE ${RGUI_IMGUI_TARGET})
+    target_include_directories(rgui_imgui PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+    )
+endif()
 
 if(MSVC)
     target_compile_options(rgui PRIVATE /W4 /permissive-)
@@ -36,6 +59,9 @@ install(TARGETS rgui
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+if(TARGET rgui_imgui)
+    install(TARGETS rgui_imgui EXPORT rguiTargets)
+endif()
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(EXPORT rguiTargets
     FILE rguiTargets.cmake

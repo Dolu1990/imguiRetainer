@@ -82,18 +82,58 @@ in its public headers. Keep the following independently buildable concerns:
    API. The embedding application retains ownership of the Lua state and
    chooses how to load scripts and report errors.
 
-The detailed shape of these APIs is still undecided.
+## Core model decisions
+
+The first implementation is intentionally a small vertical slice, rather than
+a general CSS-like UI system. It establishes the ownership and frame semantics
+that later widgets and Lua bindings must follow.
+
+- `UiTree` owns one shared root node. A `Container` owns its children with
+  `std::shared_ptr`; each child has at most one non-owning `Node*` parent.
+  `append` rejects null children, cycles, and implicit reparenting. `remove`
+  returns the detached shared pointer. There are no raw-pointer add/remove
+  overloads: they make `enable_shared_from_this` lifetime failures too easy.
+- Each `Node` receives a stable process-unique `NodeId`. Backends must use it
+  for toolkit identity and must not derive identity from labels or child order.
+- Nodes have `structure`, `layout`, and `paint` invalidation flags. Mutations
+  propagate invalidation to ancestors. `UiTree::layout` performs a retained
+  layout pass and clears the flags once it has arranged the current tree.
+- Geometry uses logical pixels: `Size`, `Rect`, margins, preferred/minimum/
+  maximum size, and flex-style `grow`. DPI scaling belongs to the embedding
+  game when it selects the logical available size.
+- Layout is a two-stage `measure(available)` / `arrange(bounds)` protocol.
+  The initial containers are `Stack` (horizontal or vertical, gap and
+  cross-axis alignment) and `Overlay`. Exact text/font measurement is not a
+  core concern; the game or rendering adapter may set suitable preferred sizes.
+- `Text` and `Button` are the initial leaves. A button callback receives the
+  button and only runs when the node is visible and enabled.
+
+The core API includes no Dear ImGui, sol2, or Lua headers. The optional
+`rgui::imgui` target is enabled with `RGUI_BUILD_IMGUI_BACKEND=ON` and requires
+the embedding build to pass an existing `RGUI_IMGUI_TARGET`; rgui never fetches
+or creates that dependency. The adapter renders into the caller-owned current
+ImGui frame. It uses node IDs, calls `End` after every `Begin`, and leaves frame
+creation, context ownership, platform integration, and `ImGui::Render` to the
+game.
+
+## Deferred decisions
+
+The following stay deliberately outside the first slice and should be added
+against concrete game requirements: queued mutations during event dispatch,
+style/theme inheritance, focus and gamepad navigation, input-consumption
+reporting, scrolling/clipping, modal/layer management, animation, localization
+and accessibility metadata, and Lua/sol2 bindings. Lua bindings should expose
+handle-based tree operations and protect callback errors so they cannot unwind
+through a renderer.
 
 ## Architecture discussion checklist
 
 The next design discussion should resolve these points before adding a large
 public API:
 
-- Widget-tree ownership and mutation rules (C++ and Lua).
-- Stable widget identity and ImGui ID mapping.
-- Layout and styling model, including inheritance and invalidation.
+- Styling model, including inheritance and invalidation.
 - State ownership: persistent widget state versus immediate-frame input.
-- Event model, callback lifetime, and safe Lua error handling.
+- Event model, callback lifetime, queued mutation, and safe Lua error handling.
 - Frame lifecycle: who starts/ends an ImGui frame and when rgui renders.
 - Lua ergonomics: userdata shape, property access, callbacks, and GC behavior.
 - Error/diagnostic policy and test strategy for headless core behavior.
