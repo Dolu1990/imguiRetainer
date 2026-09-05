@@ -13,8 +13,8 @@
       "binaryDir": "${sourceDir}/build/debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "IMGUI_RETAINER_BUILD_EXAMPLES": "ON",
-        "IMGUI_RETAINER_BUILD_TESTS": "ON"
+        "RGUI_BUILD_EXAMPLES": "ON",
+        "RGUI_BUILD_TESTS": "ON"
       }
     },
     {
@@ -24,8 +24,8 @@
       "binaryDir": "${sourceDir}/build/release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "IMGUI_RETAINER_BUILD_EXAMPLES": "ON",
-        "IMGUI_RETAINER_BUILD_TESTS": "ON"
+        "RGUI_BUILD_EXAMPLES": "ON",
+        "RGUI_BUILD_TESTS": "ON"
       }
     }
   ],

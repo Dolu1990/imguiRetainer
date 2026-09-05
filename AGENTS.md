@@ -22,12 +22,16 @@ to CTest.
 
 ## Conventions
 
-- Public headers live below `include/imgui_retainer/`.
-- Public CMake target: `imguiRetainer::imguiRetainer`.
-- Use `imgui_retainer` as the C++ namespace.
+- Public headers live below `include/rgui/`.
+- Public CMake target: `rgui::rgui`.
+- Use `rgui` as the C++ namespace.
+- `ext/imgui` and `ext/glfw` are pinned Git submodules. Initialize them with
+  `git submodule update --init --recursive` before building graphical tests.
 - Keep backend and Lua bindings in separately enabled targets when they are
   added. They should accept imported dependency targets rather than acquiring
   dependencies implicitly.
 - Do not expose Dear ImGui, sol2, or Lua headers from core public headers.
 - Add a small CTest test for behavior changes; avoid making network access part
   of the default build.
+- `rgui_imgui_smoke` is a manual GLFW/OpenGL visual smoke test. Keep
+  it on the immediate-mode API until it is replaced by retainer-mode coverage.

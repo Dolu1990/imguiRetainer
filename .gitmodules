@@ -1,0 +1,6 @@
+[submodule "ext/imgui"]
+	path = ext/imgui
+	url = https://github.com/Dolu1990/imgui.git
+[submodule "ext/glfw"]
+	path = ext/glfw
+	url = https://github.com/glfw/glfw.git

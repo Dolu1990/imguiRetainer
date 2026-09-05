@@ -1,6 +1,6 @@
-# imguiRetainer
+# rgui
 
-`imguiRetainer` is a C++23 retainer-mode GUI library intended to render with
+`rgui` is a C++23 retainer-mode GUI library intended to render with
 [Dear ImGui](https://github.com/ocornut/imgui) and expose a clean Lua API via
 [sol2](https://github.com/ThePhD/sol2). The public API is not designed yet;
 this repository currently provides the portable build and packaging foundation
@@ -12,9 +12,38 @@ on which it can be developed.
 - A compiler with C++23 support
 - Ninja or another CMake-supported build tool
 
-Dear ImGui, sol2, and Lua are deliberately not fetched by this starter project.
-The eventual integration should be opt-in and should let the parent game engine
-provide its own dependency targets.
+Dear ImGui and GLFW are pinned as Git submodules under `ext/`; initialize them
+after cloning the repository:
+
+```sh
+git submodule update --init --recursive
+```
+
+sol2 and Lua are deliberately not added yet. The eventual binding should let a
+parent game engine provide its own Lua runtime and dependency targets.
+
+## ImGui smoke test
+
+`rgui_imgui_smoke` is an opt-in GLFW/OpenGL executable used to verify
+basic Dear ImGui rendering. It displays a small immediate-mode window with
+increment, reset, and toggle controls. It is intentionally separate from the
+retainer-mode library and is never installed.
+
+With the bundled submodules initialized:
+
+```sh
+cmake -S . -B build/imgui-smoke \
+  -DRGUI_BUILD_IMGUI_SMOKE_TEST=ON
+cmake --build build/imgui-smoke --target rgui_imgui_smoke
+```
+
+The source locations can still be overridden when the game engine owns a
+different dependency checkout:
+
+```sh
+  -DRGUI_IMGUI_SOURCE_DIR=/path/to/imgui \
+  -DRGUI_GLFW_SOURCE_DIR=/path/to/glfw
+```
 
 ## Build and run
 
@@ -22,7 +51,7 @@ provide its own dependency targets.
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
 ctest --test-dir build --output-on-failure
-./build/examples/imguiRetainer_hello
+./build/examples/rgui_hello
 ```
 
 On Visual Studio, configure with `cmake -S . -B build` and build the generated
@@ -34,8 +63,8 @@ becomes `ctest --test-dir build -C Debug --output-on-failure`.
 Use the installed package target:
 
 ```cmake
-find_package(imguiRetainer CONFIG REQUIRED)
-target_link_libraries(my_game PRIVATE imguiRetainer::imguiRetainer)
+find_package(rgui CONFIG REQUIRED)
+target_link_libraries(my_game PRIVATE rgui::rgui)
 ```
 
 Or add this directory with `add_subdirectory` and link the same target.
@@ -45,6 +74,8 @@ Or add this directory with `add_subdirectory` and link the same target.
 - `include/` — public headers
 - `src/` — library implementation
 - `examples/` — small executable examples
+- `ext/` — pinned third-party Git submodules (Dear ImGui and GLFW)
+- `smoke_tests/` — opt-in graphical integration test harnesses
 - `tests/` — CTest tests without an external test framework
 - `cmake/` — install-package support
 

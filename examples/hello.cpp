@@ -1,8 +1,8 @@
-#include <imgui_retainer/imgui_retainer.hpp>
+#include <rgui/rgui.hpp>
 
 #include <iostream>
 
 int main() {
-    std::cout << "Hello from imguiRetainer " << imgui_retainer::version() << '\n';
+    std::cout << "Hello from rgui " << rgui::version() << '\n';
     return 0;
 }
