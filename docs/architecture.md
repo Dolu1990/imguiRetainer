@@ -47,10 +47,11 @@ Initialize them after cloning:
 git submodule update --init --recursive
 ```
 
-sol2 and Lua are not integrated yet. This is deliberate: the final binding
-must allow an embedding game engine to own the Lua state, allocator, Lua
-version, and dependency targets. Do not silently fetch dependencies during a
-normal core-library build.
+sol2 is pinned as the `ext/sol2` Git submodule. Lua remains an embedding-game
+dependency: the optional `rgui::lua` adapter requires its caller to provide an
+existing Lua CMake target through `RGUI_LUA_TARGET`. The binding accepts a
+caller-owned `sol::state_view`; it neither creates nor configures a Lua state.
+Do not silently fetch dependencies during a normal core-library build.
 
 ## Existing ImGui harness
 
@@ -120,6 +121,17 @@ or creates that dependency. The adapter renders into the caller-owned current
 ImGui frame. It uses node IDs, calls `End` after every `Begin`, and leaves frame
 creation, context ownership, platform integration, and `ImGui::Render` to the
 game.
+
+The optional `rgui::lua` target is enabled with `RGUI_BUILD_LUA_BINDINGS=ON`.
+It registers a focused retained-tree API using `rgui::bind_lua(sol::state_view)`.
+The manual `rgui_lua_smoke` target uses GLFW/OpenGL and Dear ImGui to render a
+Lua-built retained tree:
+
+```sh
+cmake -S . -B build/lua-smoke -DRGUI_BUILD_LUA_SMOKE_TEST=ON
+cmake --build build/lua-smoke --target rgui_lua_smoke
+./build/lua-smoke/smoke_tests/lua/rgui_lua_smoke
+```
 
 ## Deferred decisions
 

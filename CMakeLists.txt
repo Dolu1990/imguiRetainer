@@ -12,8 +12,16 @@ option(RGUI_BUILD_IMGUI_SMOKE_TEST
     "Build the Dear ImGui + GLFW immediate-mode smoke-test application" OFF)
 option(RGUI_BUILD_IMGUI_BACKEND
     "Build the optional Dear ImGui rendering adapter" OFF)
+option(RGUI_BUILD_LUA_BINDINGS
+    "Build the optional sol2 Lua binding adapter" OFF)
+option(RGUI_BUILD_LUA_SMOKE_TEST
+    "Build the sol2 Lua API smoke test" OFF)
 set(RGUI_IMGUI_TARGET "" CACHE STRING
     "Imported/normal CMake target that provides Dear ImGui (for example imgui::imgui)")
+set(RGUI_LUA_TARGET "" CACHE STRING
+    "Imported/normal CMake target that provides Lua (for example Lua::Lua)")
+set(RGUI_SOL2_TARGET "" CACHE STRING
+    "Optional imported/normal CMake target that provides sol2 (defaults to bundled ext/sol2)")
 
 add_library(rgui src/rgui.cpp)
 add_library(rgui::rgui ALIAS rgui)
@@ -42,6 +50,60 @@ if(RGUI_BUILD_IMGUI_BACKEND)
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
     )
+endif()
+
+if(RGUI_BUILD_LUA_SMOKE_TEST)
+    set(RGUI_BUILD_LUA_BINDINGS ON)
+    if(NOT RGUI_LUA_TARGET)
+        find_package(Lua 5.4 REQUIRED)
+        if(NOT TARGET Lua::Lua)
+            add_library(rgui_discovered_lua INTERFACE)
+            target_include_directories(rgui_discovered_lua INTERFACE "${LUA_INCLUDE_DIR}")
+            target_link_libraries(rgui_discovered_lua INTERFACE "${LUA_LIBRARIES}")
+            set(RGUI_LUA_TARGET rgui_discovered_lua)
+        else()
+            set(RGUI_LUA_TARGET Lua::Lua)
+        endif()
+    endif()
+endif()
+
+if(RGUI_BUILD_LUA_BINDINGS OR RGUI_BUILD_LUA_SMOKE_TEST)
+    if(NOT RGUI_SOL2_TARGET)
+        if(NOT EXISTS "${PROJECT_SOURCE_DIR}/ext/sol2/CMakeLists.txt")
+            message(FATAL_ERROR
+                "Lua bindings require the sol2 submodule. Run: git submodule update --init --recursive")
+        endif()
+        set(SOL2_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+        add_subdirectory(ext/sol2 EXCLUDE_FROM_ALL)
+        set(RGUI_SOL2_TARGET sol2::sol2)
+    endif()
+    if(NOT TARGET ${RGUI_SOL2_TARGET})
+        message(FATAL_ERROR "RGUI_SOL2_TARGET '${RGUI_SOL2_TARGET}' is not a CMake target.")
+    endif()
+endif()
+
+if(RGUI_BUILD_LUA_BINDINGS)
+    if(NOT RGUI_LUA_TARGET)
+        message(FATAL_ERROR
+            "RGUI_BUILD_LUA_BINDINGS requires RGUI_LUA_TARGET; the embedding game owns Lua.")
+    endif()
+    if(NOT TARGET ${RGUI_LUA_TARGET})
+        message(FATAL_ERROR "RGUI_LUA_TARGET '${RGUI_LUA_TARGET}' is not a CMake target.")
+    endif()
+
+    add_library(rgui_lua src/lua.cpp)
+    add_library(rgui::lua ALIAS rgui_lua)
+    target_compile_features(rgui_lua PUBLIC cxx_std_23)
+    target_link_libraries(rgui_lua PUBLIC rgui::rgui PRIVATE ${RGUI_SOL2_TARGET} ${RGUI_LUA_TARGET})
+    target_include_directories(rgui_lua PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+    )
+    if(MSVC)
+        target_compile_options(rgui_lua PRIVATE /W4 /permissive-)
+    else()
+        target_compile_options(rgui_lua PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
 endif()
 
 if(MSVC)
@@ -89,12 +151,19 @@ if(RGUI_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
+if(RGUI_BUILD_TESTS OR RGUI_BUILD_LUA_SMOKE_TEST)
+    include(CTest)
+endif()
+
 if(RGUI_BUILD_IMGUI_SMOKE_TEST)
     add_subdirectory(smoke_tests/imgui_glfw)
 endif()
 
+if(RGUI_BUILD_LUA_SMOKE_TEST)
+    add_subdirectory(smoke_tests/lua)
+endif()
+
 if(RGUI_BUILD_TESTS)
-    include(CTest)
     if(BUILD_TESTING)
         add_subdirectory(tests)
     endif()
