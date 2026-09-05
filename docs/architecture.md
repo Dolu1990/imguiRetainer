@@ -14,15 +14,17 @@ The intended environments are Linux and Windows. CMake is the build system.
 
 ## Current implementation state
 
-The library is a small buildable skeleton, not a UI implementation yet.
+The library implements a small retained-mode vertical slice. It is intentionally
+not yet a general-purpose UI system.
 
 - Public target: `rgui::rgui`
 - Public include: `<rgui/rgui.hpp>`
 - Public namespace: `rgui`
-- Current API: `rgui::version()` only
+- Core public API: retained `UiTree`, containers, `Text`, `Button`, layout
+  primitives, and `rgui::version()`
 - C++ standard: C++23
-- Unit-test target: `rgui_version_test` (registered with CTest as
-  `rgui.version`)
+- Unit-test targets: `rgui_version_test` and `rgui_ui_test` (registered with
+  CTest as `rgui.version` and `rgui.ui`)
 - Basic example: `rgui_hello`
 
 The installed CMake package is named `rgui`; consumers use:
@@ -31,6 +33,10 @@ The installed CMake package is named `rgui`; consumers use:
 find_package(rgui CONFIG REQUIRED)
 target_link_libraries(my_game PRIVATE rgui::rgui)
 ```
+
+The optional `rgui::imgui` and `rgui::lua` targets are deliberately
+superproject-only. Their dependencies are caller-owned CMake targets whose
+names cannot be reconstructed reliably by an installed package.
 
 ## Dependencies
 
@@ -100,7 +106,8 @@ that later widgets and Lua bindings must follow.
   propagate invalidation to ancestors. `UiTree::layout` performs a retained
   layout pass and clears the flags once it has arranged the current tree.
 - Geometry uses logical pixels: `Size`, `Rect`, margins, preferred/minimum/
-  maximum size, and flex-style `grow`. DPI scaling belongs to the embedding
+  maximum size, and flex-style `grow`. `grow` distributes only space that fits
+  within each child's maximum size. DPI scaling belongs to the embedding
   game when it selects the logical available size.
 - Layout is a two-stage `measure(available)` / `arrange(bounds)` protocol.
   The initial containers are `Stack` (horizontal or vertical, gap and
@@ -120,7 +127,9 @@ the embedding build to pass an existing `RGUI_IMGUI_TARGET`; rgui never fetches
 or creates that dependency. The adapter renders into the caller-owned current
 ImGui frame. It uses node IDs, calls `End` after every `Begin`, and leaves frame
 creation, context ownership, platform integration, and `ImGui::Render` to the
-game.
+game. A retained `Window`'s bounds describe its content rectangle; the adapter
+converts that into an ImGui outer-window size. Nested retained windows preserve
+their parent-relative coordinate origin.
 
 The optional `rgui::lua` target is enabled with `RGUI_BUILD_LUA_BINDINGS=ON`.
 It registers a focused retained-tree API using `rgui::bind_lua(sol::state_view)`.
@@ -139,9 +148,9 @@ The following stay deliberately outside the first slice and should be added
 against concrete game requirements: queued mutations during event dispatch,
 style/theme inheritance, focus and gamepad navigation, input-consumption
 reporting, scrolling/clipping, modal/layer management, animation, localization
-and accessibility metadata, and Lua/sol2 bindings. Lua bindings should expose
-handle-based tree operations and protect callback errors so they cannot unwind
-through a renderer.
+and accessibility metadata. The initial Lua binding exists, but its API shape,
+callback-error reporting, and GC semantics should be revisited before it is
+treated as stable.
 
 ## Architecture discussion checklist
 

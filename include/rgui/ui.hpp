@@ -42,7 +42,7 @@ class RenderContext {
 public:
     virtual ~RenderContext() = default;
     virtual void render_child(Node& child) = 0;
-    [[nodiscard]] virtual bool begin_window(std::string_view title) = 0;
+    [[nodiscard]] virtual bool begin_window(std::string_view title, Rect bounds) = 0;
     virtual void end_window() = 0;
     virtual void text(std::string_view value, Rect bounds) = 0;
     [[nodiscard]] virtual bool button(std::string_view label, Rect bounds, bool enabled) = 0;
@@ -83,6 +83,12 @@ public:
     virtual void arrange(Rect bounds) noexcept;
     virtual void render(RenderContext& context) = 0;
 
+protected:
+    /// Updates dimensions owned by the renderer's intrinsic measurement pass.
+    /// A non-zero preferred dimension supplied through set_layout_params opts
+    /// that dimension out of automatic measurement until it is reset to zero.
+    void set_automatic_preferred_size(Size value) noexcept;
+
 private:
     friend class Container;
     NodeId id_;
@@ -92,6 +98,8 @@ private:
     LayoutParams layout_{};
     Rect bounds_{};
     Dirty dirty_ = Dirty::structure | Dirty::layout | Dirty::paint;
+    bool automatic_preferred_width_ = true;
+    bool automatic_preferred_height_ = true;
 };
 
 class Container : public Node {

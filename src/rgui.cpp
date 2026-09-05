@@ -45,7 +45,22 @@ void Node::set_enabled(bool value) noexcept {
 
 void Node::set_layout_params(LayoutParams value) noexcept {
     layout_ = value;
+    automatic_preferred_width_ = value.preferred.width == 0.0F;
+    automatic_preferred_height_ = value.preferred.height == 0.0F;
     invalidate(Dirty::layout);
+}
+
+void Node::set_automatic_preferred_size(Size value) noexcept {
+    bool changed = false;
+    if (automatic_preferred_width_ && layout_.preferred.width != value.width) {
+        layout_.preferred.width = value.width;
+        changed = true;
+    }
+    if (automatic_preferred_height_ && layout_.preferred.height != value.height) {
+        layout_.preferred.height = value.height;
+        changed = true;
+    }
+    if (changed) invalidate(Dirty::layout);
 }
 
 void Node::invalidate(Dirty flags) noexcept {
@@ -131,7 +146,6 @@ Size Stack::measure(Size available) const noexcept {
 
 void Stack::arrange(Rect bounds) noexcept {
     Node::arrange(bounds);
-    float total_grow = 0.0F;
     float fixed = 0.0F;
     std::size_t visible_children = 0;
     const Size available{bounds.width, bounds.height};
@@ -139,18 +153,49 @@ void Stack::arrange(Rect bounds) noexcept {
         if (!child->visible()) continue;
         const Insets& m = child->layout_params().margin;
         fixed += primary(child->measure(available), axis_) + (axis_ == Axis::horizontal ? m.left + m.right : m.top + m.bottom);
-        total_grow += std::max(0.0F, child->layout_params().grow);
         ++visible_children;
     }
     if (visible_children > 1) fixed += gap_ * static_cast<float>(visible_children - 1);
-    float cursor = axis_ == Axis::horizontal ? bounds.x : bounds.y;
     const float extra = std::max(0.0F, primary(available, axis_) - fixed);
-    for (const NodePtr& child : children_) {
+    std::vector<float> main_sizes(children_.size(), 0.0F);
+    std::vector<bool> can_grow(children_.size(), false);
+    for (std::size_t index = 0; index < children_.size(); ++index) {
+        const NodePtr& child = children_[index];
+        if (!child->visible()) continue;
+        main_sizes[index] = primary(child->measure(available), axis_);
+        can_grow[index] = child->layout_params().grow > 0.0F
+            && primary(child->layout_params().maximum, axis_) > main_sizes[index];
+    }
+    float remaining = extra;
+    while (remaining > 0.001F) {
+        float active_grow = 0.0F;
+        for (std::size_t index = 0; index < children_.size(); ++index) {
+            if (can_grow[index]) active_grow += children_[index]->layout_params().grow;
+        }
+        if (active_grow == 0.0F) break;
+
+        float distributed = 0.0F;
+        for (std::size_t index = 0; index < children_.size(); ++index) {
+            if (!can_grow[index]) continue;
+            const float maximum = primary(children_[index]->layout_params().maximum, axis_);
+            const float share = remaining * children_[index]->layout_params().grow / active_grow;
+            const float added = std::min(share, std::max(0.0F, maximum - main_sizes[index]));
+            main_sizes[index] += added;
+            distributed += added;
+            if (main_sizes[index] >= maximum - 0.001F) can_grow[index] = false;
+        }
+        if (distributed <= 0.001F) break;
+        remaining -= distributed;
+    }
+
+    float cursor = axis_ == Axis::horizontal ? bounds.x : bounds.y;
+    for (std::size_t index = 0; index < children_.size(); ++index) {
+        const NodePtr& child = children_[index];
         if (!child->visible()) continue;
         const LayoutParams& p = child->layout_params();
         const Insets& m = p.margin;
         Size desired = child->measure(available);
-        float main = primary(desired, axis_) + (total_grow > 0.0F ? extra * std::max(0.0F, p.grow) / total_grow : 0.0F);
+        const float main = main_sizes[index];
         const float available_cross = cross(available, axis_);
         const float before_main = axis_ == Axis::horizontal ? m.left : m.top;
         const float after_main = axis_ == Axis::horizontal ? m.right : m.bottom;
@@ -176,8 +221,9 @@ Size Overlay::measure(Size available) const noexcept {
     for (const NodePtr& child : children_) {
         if (!child->visible()) continue;
         const Size desired = child->measure(available);
-        result.width = std::max(result.width, desired.width);
-        result.height = std::max(result.height, desired.height);
+        const Insets& margin = child->layout_params().margin;
+        result.width = std::max(result.width, desired.width + margin.left + margin.right);
+        result.height = std::max(result.height, desired.height + margin.top + margin.bottom);
     }
     return clamp_size(result, layout_params());
 }
@@ -185,33 +231,27 @@ Size Overlay::measure(Size available) const noexcept {
 void Overlay::arrange(Rect bounds) noexcept {
     Node::arrange(bounds);
     for (const NodePtr& child : children_) if (child->visible()) {
-        const Size desired = child->measure({bounds.width, bounds.height});
-        child->arrange({bounds.x, bounds.y, desired.width, desired.height});
+        const Insets& margin = child->layout_params().margin;
+        const Size available{std::max(0.0F, bounds.width - margin.left - margin.right),
+                             std::max(0.0F, bounds.height - margin.top - margin.bottom)};
+        const Size desired = child->measure(available);
+        child->arrange({bounds.x + margin.left, bounds.y + margin.top,
+                        std::min(desired.width, available.width),
+                        std::min(desired.height, available.height)});
     }
 }
 
 Window::Window(std::string title) : title_(std::move(title)) {}
 void Window::set_title(std::string_view value) { title_ = value; invalidate(Dirty::paint); }
 void Window::render(RenderContext& context) {
-    const bool render_contents = context.begin_window(title_);
+    const bool render_contents = context.begin_window(title_, bounds());
     if (render_contents) Container::render(context);
     context.end_window();
 }
 Text::Text(std::string value) : value_(std::move(value)) {}
 void Text::set_value(std::string_view value) { value_ = value; invalidate(Dirty::paint | Dirty::layout); }
 void Text::apply_default_layout(LayoutContext& context) {
-    const Size measured = context.measure_text(value_);
-    LayoutParams params = layout_params();
-    bool changed = false;
-    if (params.preferred.width == 0.0F && measured.width > 0.0F) {
-        params.preferred.width = measured.width;
-        changed = true;
-    }
-    if (params.preferred.height == 0.0F && measured.height > 0.0F) {
-        params.preferred.height = measured.height;
-        changed = true;
-    }
-    if (changed) set_layout_params(params);
+    set_automatic_preferred_size(context.measure_text(value_));
 }
 void Text::render(RenderContext& context) { context.text(value_, bounds()); }
 Button::Button(std::string label) : label_(std::move(label)) {}
@@ -219,18 +259,7 @@ void Button::set_label(std::string_view value) { label_ = value; invalidate(Dirt
 void Button::set_on_click(std::function<void(Button&)> callback) { on_click_ = std::move(callback); }
 void Button::activate() { if (visible() && enabled() && on_click_) on_click_(*this); }
 void Button::apply_default_layout(LayoutContext& context) {
-    const Size measured = context.measure_button(label_);
-    LayoutParams params = layout_params();
-    bool changed = false;
-    if (params.preferred.width == 0.0F && measured.width > 0.0F) {
-        params.preferred.width = measured.width;
-        changed = true;
-    }
-    if (params.preferred.height == 0.0F && measured.height > 0.0F) {
-        params.preferred.height = measured.height;
-        changed = true;
-    }
-    if (changed) set_layout_params(params);
+    set_automatic_preferred_size(context.measure_button(label_));
 }
 void Button::render(RenderContext& context) {
     if (context.button(label_, bounds(), enabled())) activate();

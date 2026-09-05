@@ -14,7 +14,7 @@ void expect(bool condition) { if (!condition) ++failures; }
 class RecordingContext final : public rgui::RenderContext {
 public:
     void render_child(rgui::Node& child) override { child.render(*this); }
-    bool begin_window(std::string_view) override { return true; }
+    bool begin_window(std::string_view, rgui::Rect) override { return true; }
     void end_window() override {}
     void text(std::string_view value, rgui::Rect) override { rendered_text = value; }
     bool button(std::string_view label, rgui::Rect, bool enabled) override {
@@ -108,5 +108,35 @@ int main() {
     expect(equal(automatic_text->layout_params().preferred.height, 16.0F));
     expect(equal(automatic_button->layout_params().preferred.width, 36.0F));
     expect(equal(automatic_button->bounds().y, 16.0F));
+
+    automatic_text->set_value("longer text");
+    automatic_tree.apply_default_layout(measuring_context);
+    automatic_tree.layout({200.0F, 100.0F});
+    expect(equal(automatic_text->layout_params().preferred.width, 110.0F));
+
+    auto limited_grow = std::make_shared<rgui::Stack>(rgui::Axis::horizontal);
+    auto capped = std::make_shared<rgui::Text>("capped");
+    capped->set_layout_params({.preferred = {10.0F, 10.0F}, .maximum = {20.0F, 20.0F}, .grow = 1.0F});
+    auto remaining = std::make_shared<rgui::Text>("remaining");
+    remaining->set_layout_params({.preferred = {10.0F, 10.0F}, .maximum = {100.0F, 20.0F}, .grow = 1.0F});
+    limited_grow->append(capped);
+    limited_grow->append(remaining);
+    rgui::UiTree grow_tree;
+    grow_tree.set_root(limited_grow);
+    grow_tree.layout({100.0F, 20.0F});
+    expect(equal(capped->bounds().width, 20.0F));
+    expect(equal(remaining->bounds().width, 80.0F));
+
+    auto overlay = std::make_shared<rgui::Overlay>();
+    auto overlay_child = std::make_shared<rgui::Text>("overlay");
+    overlay_child->set_layout_params({.preferred = {20.0F, 10.0F}, .margin = {2.0F, 3.0F, 4.0F, 5.0F}});
+    overlay->append(overlay_child);
+    rgui::UiTree overlay_tree;
+    overlay_tree.set_root(overlay);
+    expect(equal(overlay->measure({100.0F, 100.0F}).width, 26.0F));
+    expect(equal(overlay->measure({100.0F, 100.0F}).height, 18.0F));
+    overlay_tree.layout({100.0F, 100.0F});
+    expect(equal(overlay_child->bounds().x, 2.0F));
+    expect(equal(overlay_child->bounds().y, 3.0F));
     return failures == 0 ? 0 : 1;
 }

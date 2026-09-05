@@ -121,9 +121,9 @@ install(TARGETS rgui
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
-if(TARGET rgui_imgui)
-    install(TARGETS rgui_imgui EXPORT rguiTargets)
-endif()
+# Optional adapters consume caller-owned targets with arbitrary names. They
+# therefore remain superproject-only targets; exporting rgui_imgui would leave
+# an installed package with an unresolved Dear ImGui dependency.
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(EXPORT rguiTargets
     FILE rguiTargets.cmake
