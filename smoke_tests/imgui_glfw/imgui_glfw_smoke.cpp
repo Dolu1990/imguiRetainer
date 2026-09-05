@@ -8,6 +8,7 @@
 
 #include <iostream>
 #include <memory>
+#include <random>
 #include <string>
 
 namespace {
@@ -63,8 +64,10 @@ int main() {
 
     auto controls = std::make_shared<rgui::Stack>(rgui::Axis::horizontal);
     controls->set_gap(8.0F);
+    auto add_random_label = std::make_shared<rgui::Button>("Add random label");
     auto increment = std::make_shared<rgui::Button>("Increment");
     auto reset = std::make_shared<rgui::Button>("Reset");
+    add_random_label->set_layout_params({.preferred = {150.0F, 28.0F}});
     increment->set_layout_params({.preferred = {110.0F, 28.0F}});
     reset->set_layout_params({.preferred = {80.0F, 28.0F}});
 
@@ -77,17 +80,33 @@ int main() {
         ++clicks;
         update_status();
     });
-    reset->set_on_click([&](rgui::Button&) {
-        clicks = 0;
-        update_status();
-    });
     update_status();
 
+    auto generated_labels = std::make_shared<rgui::Stack>();
+    generated_labels->set_gap(4.0F);
+    std::mt19937 random_engine{std::random_device{}()};
+    std::uniform_int_distribution<int> random_number{0, 9999};
+    add_random_label->set_on_click([&](rgui::Button&) {
+        auto label = std::make_shared<rgui::Text>(
+            "Random number: " + std::to_string(random_number(random_engine)));
+        label->set_layout_params({.preferred = {400.0F, 20.0F}});
+        generated_labels->append(std::move(label));
+    });
+    reset->set_on_click([&](rgui::Button&) {
+        clicks = 0;
+        generated_labels->clear();
+        update_status();
+    });
+
+    // Render this before the controls: a callback appends here after this
+    // container has been visited, so the new node is laid out next frame.
+    ui_window->append(description);
+    ui_window->append(status);
+    controls->append(add_random_label);
     controls->append(increment);
     controls->append(reset);
-    ui_window->append(description);
     ui_window->append(controls);
-    ui_window->append(status);
+    ui_window->append(generated_labels);
 
     rgui::UiTree tree;
     tree.set_root(ui_window);
