@@ -25,7 +25,6 @@ not yet a general-purpose UI system.
 - C++ standard: C++23
 - Unit-test targets: `rgui_version_test` and `rgui_ui_test` (registered with
   CTest as `rgui.version` and `rgui.ui`)
-- Basic example: `rgui_hello`
 
 The installed CMake package is named `rgui`; consumers use:
 
@@ -44,8 +43,8 @@ Third-party code is pinned as Git submodules:
 
 | Dependency | Location | Current role |
 | --- | --- | --- |
-| Dear ImGui | `ext/imgui` | Rendering backend and immediate-mode smoke test |
-| GLFW | `ext/glfw` | Window/OpenGL context for the smoke test |
+| Dear ImGui | `ext/imgui` | Rendering backend and immediate-mode demo |
+| GLFW | `ext/glfw` | Window/OpenGL context for the demo |
 
 Initialize them after cloning:
 
@@ -59,16 +58,16 @@ existing Lua CMake target through `RGUI_LUA_TARGET`. The binding accepts a
 caller-owned `sol::state_view`; it neither creates nor configures a Lua state.
 Do not silently fetch dependencies during a normal core-library build.
 
-## Existing ImGui harness
+## Existing ImGui demo
 
-The opt-in `rgui_imgui_smoke` executable uses GLFW plus OpenGL and the regular
+The opt-in `rgui_imgui_glfw_demo` executable uses GLFW plus OpenGL and the regular
 immediate-mode Dear ImGui API. It displays a simple window with increment,
-reset, and toggle controls. It is a manual visual smoke test; it is not
+reset, and toggle controls. It is a manual visual demo; it is not
 installed and is not part of the public library API.
 
 ```sh
-cmake -S . -B build/imgui-smoke -DRGUI_BUILD_IMGUI_SMOKE_TEST=ON
-cmake --build build/imgui-smoke --target rgui_imgui_smoke
+cmake -S . -B build/imgui-demo -DRGUI_BUILD_IMGUI_GLFW_DEMO=ON
+cmake --build build/imgui-demo --target rgui_imgui_glfw_demo
 ```
 
 `RGUI_IMGUI_SOURCE_DIR` and `RGUI_GLFW_SOURCE_DIR` can override the bundled
@@ -133,13 +132,13 @@ their parent-relative coordinate origin.
 
 The optional `rgui::lua` target is enabled with `RGUI_BUILD_LUA_BINDINGS=ON`.
 It registers a focused retained-tree API using `rgui::bind_lua(sol::state_view)`.
-The manual `rgui_lua_smoke` target uses GLFW/OpenGL and Dear ImGui to render a
+The manual `rgui_lua_demo` target uses GLFW/OpenGL and Dear ImGui to render a
 Lua-built retained tree:
 
 ```sh
-cmake -S . -B build/lua-smoke -DRGUI_BUILD_LUA_SMOKE_TEST=ON
-cmake --build build/lua-smoke --target rgui_lua_smoke
-./build/lua-smoke/smoke_tests/lua/rgui_lua_smoke
+cmake -S . -B build/lua-demo -DRGUI_BUILD_LUA_DEMO=ON
+cmake --build build/lua-demo --target rgui_lua_demo
+./build/lua-demo/demo/lua/rgui_lua_demo
 ```
 
 ## Deferred decisions
@@ -173,8 +172,8 @@ cmake --preset debug
 cmake --build --preset debug
 ctest --preset debug
 
-cmake -S . -B build/imgui-smoke -DRGUI_BUILD_IMGUI_SMOKE_TEST=ON
-cmake --build build/imgui-smoke --target rgui_imgui_smoke
+cmake -S . -B build/imgui-demo -DRGUI_BUILD_IMGUI_GLFW_DEMO=ON
+cmake --build build/imgui-demo --target rgui_imgui_glfw_demo
 ```
 
 The second command verifies compilation and linkage of the graphical harness;

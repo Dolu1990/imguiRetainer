@@ -38,5 +38,5 @@ to CTest.
 - Do not expose Dear ImGui, sol2, or Lua headers from core public headers.
 - Add a small CTest test for behavior changes; avoid making network access part
   of the default build.
-- `rgui_imgui_smoke` is a manual GLFW/OpenGL visual smoke test. Keep
+- `rgui_imgui_glfw_demo` is a manual GLFW/OpenGL visual demo. Keep
   it on the immediate-mode API until it is replaced by retainer-mode coverage.

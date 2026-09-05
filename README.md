@@ -22,9 +22,9 @@ git submodule update --init --recursive
 sol2 and Lua are deliberately not added yet. The eventual binding should let a
 parent game engine provide its own Lua runtime and dependency targets.
 
-## ImGui smoke test
+## ImGui GLFW demo
 
-`rgui_imgui_smoke` is an opt-in GLFW/OpenGL executable used to verify
+`rgui_imgui_glfw_demo` is an opt-in GLFW/OpenGL executable that demonstrates
 basic Dear ImGui rendering. It displays a small immediate-mode window with
 increment, reset, and toggle controls. It is intentionally separate from the
 retainer-mode library and is never installed.
@@ -32,9 +32,9 @@ retainer-mode library and is never installed.
 With the bundled submodules initialized:
 
 ```sh
-cmake -S . -B build/imgui-smoke \
-  -DRGUI_BUILD_IMGUI_SMOKE_TEST=ON
-cmake --build build/imgui-smoke --target rgui_imgui_smoke
+cmake -S . -B build/imgui-demo \
+  -DRGUI_BUILD_IMGUI_GLFW_DEMO=ON
+cmake --build build/imgui-demo --target rgui_imgui_glfw_demo
 ```
 
 The source locations can still be overridden when the game engine owns a
@@ -51,7 +51,6 @@ different dependency checkout:
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
 ctest --test-dir build --output-on-failure
-./build/examples/rgui_hello
 ```
 
 On Visual Studio, configure with `cmake -S . -B build` and build the generated
@@ -73,9 +72,8 @@ Or add this directory with `add_subdirectory` and link the same target.
 
 - `include/` — public headers
 - `src/` — library implementation
-- `examples/` — small executable examples
 - `ext/` — pinned third-party Git submodules (Dear ImGui and GLFW)
-- `smoke_tests/` — opt-in graphical integration test harnesses
+- `demo/` — opt-in graphical demonstration applications
 - `tests/` — CTest tests without an external test framework
 - `cmake/` — install-package support
 

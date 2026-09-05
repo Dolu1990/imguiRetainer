@@ -6,16 +6,15 @@ project(rgui
     LANGUAGES CXX
 )
 
-option(RGUI_BUILD_EXAMPLES "Build rgui examples" ON)
 option(RGUI_BUILD_TESTS "Build rgui tests" ON)
-option(RGUI_BUILD_IMGUI_SMOKE_TEST
-    "Build the Dear ImGui + GLFW immediate-mode smoke-test application" OFF)
+option(RGUI_BUILD_IMGUI_GLFW_DEMO
+    "Build the Dear ImGui + GLFW immediate-mode demo application" OFF)
 option(RGUI_BUILD_IMGUI_BACKEND
     "Build the optional Dear ImGui rendering adapter" OFF)
 option(RGUI_BUILD_LUA_BINDINGS
     "Build the optional sol2 Lua binding adapter" OFF)
-option(RGUI_BUILD_LUA_SMOKE_TEST
-    "Build the sol2 Lua API smoke test" OFF)
+option(RGUI_BUILD_LUA_DEMO
+    "Build the sol2 Lua API demo application" OFF)
 set(RGUI_IMGUI_TARGET "" CACHE STRING
     "Imported/normal CMake target that provides Dear ImGui (for example imgui::imgui)")
 set(RGUI_LUA_TARGET "" CACHE STRING
@@ -52,7 +51,7 @@ if(RGUI_BUILD_IMGUI_BACKEND)
     )
 endif()
 
-if(RGUI_BUILD_LUA_SMOKE_TEST)
+if(RGUI_BUILD_LUA_DEMO)
     set(RGUI_BUILD_LUA_BINDINGS ON)
     if(NOT RGUI_LUA_TARGET)
         find_package(Lua 5.4 REQUIRED)
@@ -67,7 +66,7 @@ if(RGUI_BUILD_LUA_SMOKE_TEST)
     endif()
 endif()
 
-if(RGUI_BUILD_LUA_BINDINGS OR RGUI_BUILD_LUA_SMOKE_TEST)
+if(RGUI_BUILD_LUA_BINDINGS OR RGUI_BUILD_LUA_DEMO)
     if(NOT RGUI_SOL2_TARGET)
         if(NOT EXISTS "${PROJECT_SOURCE_DIR}/ext/sol2/CMakeLists.txt")
             message(FATAL_ERROR
@@ -147,20 +146,16 @@ install(FILES
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rgui
 )
 
-if(RGUI_BUILD_EXAMPLES)
-    add_subdirectory(examples)
-endif()
-
-if(RGUI_BUILD_TESTS OR RGUI_BUILD_LUA_SMOKE_TEST)
+if(RGUI_BUILD_TESTS OR RGUI_BUILD_LUA_DEMO)
     include(CTest)
 endif()
 
-if(RGUI_BUILD_IMGUI_SMOKE_TEST)
-    add_subdirectory(smoke_tests/imgui_glfw)
+if(RGUI_BUILD_IMGUI_GLFW_DEMO)
+    add_subdirectory(demo/imgui_glfw)
 endif()
 
-if(RGUI_BUILD_LUA_SMOKE_TEST)
-    add_subdirectory(smoke_tests/lua)
+if(RGUI_BUILD_LUA_DEMO)
+    add_subdirectory(demo/lua)
 endif()
 
 if(RGUI_BUILD_TESTS)
