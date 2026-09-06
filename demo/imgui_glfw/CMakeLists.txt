@@ -1,16 +1,8 @@
 # This is a demonstration executable, not part of the installed library API.
-# Dear ImGui does not ship a canonical CMake target, so build only the sources
-# required by this GLFW/OpenGL demo.
-set(RGUI_IMGUI_SOURCE_DIR "${PROJECT_SOURCE_DIR}/ext/imgui" CACHE PATH
-    "Path to the root of a Dear ImGui source checkout")
+# rgui::rgui owns the pinned Dear ImGui library; this target only adds the
+# GLFW/OpenGL platform and renderer backends.
 set(RGUI_GLFW_SOURCE_DIR "${PROJECT_SOURCE_DIR}/ext/glfw" CACHE PATH
     "Optional path to a GLFW source checkout when glfw3 is not installed")
-
-if(NOT EXISTS "${RGUI_IMGUI_SOURCE_DIR}/imgui.h")
-    message(FATAL_ERROR
-        "RGUI_BUILD_IMGUI_GLFW_DEMO requires a Dear ImGui checkout. "
-        "Set RGUI_IMGUI_SOURCE_DIR to its root directory.")
-endif()
 
 find_package(glfw3 CONFIG QUIET)
 if(TARGET glfw)
@@ -36,29 +28,17 @@ endif()
 
 find_package(OpenGL REQUIRED)
 
-add_library(rgui_imgui_vendor STATIC
-    "${RGUI_IMGUI_SOURCE_DIR}/imgui.cpp"
-    "${RGUI_IMGUI_SOURCE_DIR}/imgui_draw.cpp"
-    "${RGUI_IMGUI_SOURCE_DIR}/imgui_tables.cpp"
-    "${RGUI_IMGUI_SOURCE_DIR}/imgui_widgets.cpp"
-)
-target_compile_features(rgui_imgui_vendor PUBLIC cxx_std_23)
-target_include_directories(rgui_imgui_vendor PUBLIC
-    "${RGUI_IMGUI_SOURCE_DIR}")
-
 add_executable(rgui_imgui_glfw_demo
     imgui_glfw_demo.cpp
-    "${PROJECT_SOURCE_DIR}/src/imgui_backend.cpp"
-    "${RGUI_IMGUI_SOURCE_DIR}/backends/imgui_impl_glfw.cpp"
-    "${RGUI_IMGUI_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp"
+    "${PROJECT_SOURCE_DIR}/ext/imgui/backends/imgui_impl_glfw.cpp"
+    "${PROJECT_SOURCE_DIR}/ext/imgui/backends/imgui_impl_opengl3.cpp"
 )
 target_compile_features(rgui_imgui_glfw_demo PRIVATE cxx_std_23)
 target_include_directories(rgui_imgui_glfw_demo PRIVATE
-    "${RGUI_IMGUI_SOURCE_DIR}"
-    "${RGUI_IMGUI_SOURCE_DIR}/backends")
+    "${PROJECT_SOURCE_DIR}/ext/imgui"
+    "${PROJECT_SOURCE_DIR}/ext/imgui/backends")
 target_link_libraries(rgui_imgui_glfw_demo PRIVATE
     rgui::rgui
-    rgui_imgui_vendor
     ${rgui_glfw_target}
     OpenGL::GL)
 

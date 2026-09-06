@@ -1,5 +1,5 @@
 #include <rgui/lua.hpp>
-#include <rgui/imgui_backend.hpp>
+#include <rgui/rgui.hpp>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -53,7 +53,6 @@ int main() {
     const sol::protected_function_result result = lua.safe_script(R"(
         local root = rgui.window("Lua-built retained rgui")
         root.axis = "vertical"
-        root.gap = 10
 
         local description = rgui.text("This retained UI was constructed and is updated by Lua.")
         local status = rgui.text("Button clicks: 0")
@@ -88,8 +87,7 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        rgui::imgui_backend::layout(tree, {480.0F, 140.0F});
-        rgui::imgui_backend::render(tree);
+        tree.draw();
         static_cast<void>(tree.flush_events());
 
         ImGui::Render();

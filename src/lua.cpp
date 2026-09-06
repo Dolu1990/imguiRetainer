@@ -17,26 +17,8 @@ Axis axis_from_string(const std::string& value) {
     throw std::invalid_argument("axis must be 'horizontal' or 'vertical'");
 }
 
-Align align_from_string(const std::string& value) {
-    if (value == "start") return Align::start;
-    if (value == "center") return Align::center;
-    if (value == "end") return Align::end;
-    if (value == "stretch") return Align::stretch;
-    throw std::invalid_argument("align must be 'start', 'center', 'end', or 'stretch'");
-}
-
 const char* axis_to_string(Axis value) noexcept {
     return value == Axis::horizontal ? "horizontal" : "vertical";
-}
-
-const char* align_to_string(Align value) noexcept {
-    switch (value) {
-    case Align::start: return "start";
-    case Align::center: return "center";
-    case Align::end: return "end";
-    case Align::stretch: return "stretch";
-    }
-    return "start";
 }
 
 NodePtr node_from_lua(const sol::object& value) {
@@ -56,12 +38,7 @@ void bind_lua(sol::state_view state) {
     state.new_usertype<Node>("rgui.Node", sol::no_constructor,
         "id", &Node::id,
         "visible", sol::property(&Node::visible, &Node::set_visible),
-        "enabled", sol::property(&Node::enabled, &Node::set_enabled),
-        "set_preferred_size", [](Node& node, float width, float height) {
-            LayoutParams params = node.layout_params();
-            params.preferred = {width, height};
-            node.set_layout_params(params);
-        });
+        "enabled", sol::property(&Node::enabled, &Node::set_enabled));
     state.new_usertype<Container>("rgui.Container", sol::no_constructor,
         sol::base_classes, sol::bases<Node>(),
         "append", [](Container& parent, const sol::object& child) { parent.append(node_from_lua(child)); },
@@ -70,11 +47,7 @@ void bind_lua(sol::state_view state) {
         sol::base_classes, sol::bases<Container, Node>(),
         "axis", sol::property(
             [](const Stack& stack) { return axis_to_string(stack.axis()); },
-            [](Stack& stack, const std::string& value) { stack.set_axis(axis_from_string(value)); }),
-        "gap", sol::property(&Stack::gap, &Stack::set_gap),
-        "align", sol::property(
-            [](const Stack& stack) { return align_to_string(stack.align()); },
-            [](Stack& stack, const std::string& value) { stack.set_align(align_from_string(value)); }));
+            [](Stack& stack, const std::string& value) { stack.set_axis(axis_from_string(value)); }));
     state.new_usertype<Overlay>("rgui.Overlay", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>());
     state.new_usertype<Window>("rgui.Window", sol::no_constructor,
@@ -104,7 +77,7 @@ void bind_lua(sol::state_view state) {
         "activate", &Button::activate);
     state.new_usertype<UiTree>("rgui.UiTree", sol::constructors<UiTree()>(),
         "set_root", [](UiTree& tree, const sol::object& root) { tree.set_root(node_from_lua(root)); },
-        "layout", [](UiTree& tree, float width, float height) { tree.layout({width, height}); },
+        "draw", &UiTree::draw,
         "flush_events", &UiTree::flush_events);
 
     api.set_function("stack", [](const std::string& axis) {

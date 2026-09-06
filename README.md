@@ -3,8 +3,8 @@
 `rgui` is a C++23 retainer-mode GUI library intended to render with
 [Dear ImGui](https://github.com/ocornut/imgui) and expose a clean Lua API via
 [sol2](https://github.com/ThePhD/sol2). It currently provides a deliberately
-small retained-mode vertical slice: `UiTree`, containers, text, buttons, basic
-layout, an optional ImGui renderer, and optional Lua bindings. See
+small retained-mode vertical slice: `UiTree`, containers, text, buttons,
+direct Dear ImGui drawing, and optional Lua bindings. See
 [docs/architecture.md](docs/architecture.md) for the supported boundary and
 deferred design decisions.
 
@@ -37,14 +37,6 @@ With the bundled submodules initialized:
 cmake -S . -B build/imgui-demo \
   -DRGUI_BUILD_IMGUI_GLFW_DEMO=ON
 cmake --build build/imgui-demo --target rgui_imgui_glfw_demo
-```
-
-The source locations can still be overridden when the game engine owns a
-different dependency checkout:
-
-```sh
-  -DRGUI_IMGUI_SOURCE_DIR=/path/to/imgui \
-  -DRGUI_GLFW_SOURCE_DIR=/path/to/glfw
 ```
 
 ## Build and run
