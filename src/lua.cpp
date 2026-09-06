@@ -49,6 +49,7 @@ NodePtr node_from_lua(const sol::object& value) {
     if (value.is<std::shared_ptr<Window>>()) return value.as<std::shared_ptr<Window>>();
     if (value.is<std::shared_ptr<Stack>>()) return value.as<std::shared_ptr<Stack>>();
     if (value.is<std::shared_ptr<Table>>()) return value.as<std::shared_ptr<Table>>();
+    if (value.is<std::shared_ptr<ScrollArea>>()) return value.as<std::shared_ptr<ScrollArea>>();
     if (value.is<std::shared_ptr<AnchoredPanel>>()) return value.as<std::shared_ptr<AnchoredPanel>>();
     if (value.is<std::shared_ptr<Text>>()) return value.as<std::shared_ptr<Text>>();
     if (value.is<std::shared_ptr<Button>>()) return value.as<std::shared_ptr<Button>>();
@@ -88,6 +89,11 @@ void bind_lua(sol::state_view state) {
         "header", [](const Table& table, std::size_t column) {
             if (column == 0) throw std::invalid_argument("table column indices start at 1");
             return std::string(table.header(column - 1));
+        });
+    state.new_usertype<ScrollArea>("rgui.ScrollArea", sol::no_constructor,
+        sol::base_classes, sol::bases<Container, Node>(),
+        "set_size", [](ScrollArea& area, float width, float height) {
+            area.set_size(Size{width, height});
         });
     state.new_usertype<AnchoredPanel>("rgui.AnchoredPanel", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>(),
@@ -151,6 +157,9 @@ void bind_lua(sol::state_view state) {
     });
     api.set_function("window", [](const std::string& title) { return std::make_shared<Window>(title); });
     api.set_function("table", [](std::size_t columns) { return std::make_shared<Table>(columns); });
+    api.set_function("scroll_area", [](float width, float height) {
+        return std::make_shared<ScrollArea>(Size{width, height});
+    });
     api.set_function("text", [](const std::string& value) { return std::make_shared<Text>(value); });
     api.set_function("button", [](const std::string& label) { return std::make_shared<Button>(label); });
     api.set_function("tree", [] { return UiTree{}; });

@@ -119,6 +119,25 @@ void Table::draw() {
     ImGui::EndTable();
 }
 
+ScrollArea::ScrollArea(Size size) : size_(size) {
+    if (size.width < 0.0F || size.height < 0.0F) {
+        throw std::invalid_argument("rgui scroll area size cannot be negative");
+    }
+}
+void ScrollArea::set_size(Size size) {
+    if (size.width < 0.0F || size.height < 0.0F) {
+        throw std::invalid_argument("rgui scroll area size cannot be negative");
+    }
+    size_ = size;
+}
+void ScrollArea::draw() {
+    const std::string area_id = "##rgui-scroll-area-" + std::to_string(id());
+    const bool draw_contents = ImGui::BeginChild(area_id.c_str(), {size_.width, size_.height},
+                                                 ImGuiChildFlags_Borders);
+    if (draw_contents) draw_children();
+    ImGui::EndChild();
+}
+
 namespace {
 ImVec2 point_in_rect(AnchorPoint point, Size size) {
     const float center_x = size.width * 0.5F;

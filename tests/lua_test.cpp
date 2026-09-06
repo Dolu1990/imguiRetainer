@@ -17,10 +17,12 @@ int main() {
         label = rgui.text("Status")
         action = rgui.button("Continue")
         stats = rgui.table(2)
+        log = rgui.scroll_area(240, 80)
         stats:set_header(1, "Stat")
         stats:set_header(2, "Value")
         stats:append(rgui.text("Health"))
         stats:append(rgui.text("100"))
+        log:append(rgui.text("First log entry"))
         panel:append(label, "top_left", "top_left", 12, 12)
         panel:append(action, "top", "top", 0, 32)
         panel:set_second_anchor(action, "top_right", "top_right", -12, 32)
@@ -37,6 +39,7 @@ int main() {
     const std::shared_ptr<rgui::AnchoredPanel> full_panel = lua["full_panel"];
     const std::shared_ptr<rgui::Button> action = lua["action"];
     const std::shared_ptr<rgui::Table> stats = lua["stats"];
+    const std::shared_ptr<rgui::ScrollArea> log = lua["log"];
     const rgui::Anchor anchor = panel->anchor(*action);
     const std::optional<rgui::Anchor>& second_anchor = panel->second_anchor(*action);
     const std::shared_ptr<rgui::Button> failing_button = lua["failing_button"];
@@ -59,6 +62,7 @@ int main() {
                    second_anchor->offset_x == -12.0F && second_anchor->offset_y == 32.0F
                    && stats->columns() == 2 && stats->header(0) == "Stat" && stats->header(1) == "Value"
                    && stats->children().size() == 2
+                   && log->size().width == 240.0F && log->size().height == 80.0F
                    && callback_error_propagated
                ? 0
                : 1;

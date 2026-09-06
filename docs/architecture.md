@@ -11,7 +11,7 @@ state.
 
 - Public target: `rgui::rgui`
 - Public headers: `<rgui/rgui.hpp>` and `<rgui/ui.hpp>`
-- Retained nodes: `Window`, `Stack`, `Table`, `AnchoredPanel`, `Text`, and `Button`
+- Retained nodes: `Window`, `Stack`, `Table`, `ScrollArea`, `AnchoredPanel`, `Text`, and `Button`
 - Each node implements `draw()`; custom nodes may include
   `imgui.h` and use the Dear ImGui API directly.
 - `UiTree::draw()` validates that a current ImGui context exists, establishes
@@ -85,6 +85,6 @@ cmake --build build/imgui-demo --target rgui_imgui_glfw_demo
 Add new retained node types only against concrete game requirements. Styling
 should be represented as ImGui-facing flags or scoped style operations, rather
 than a renderer-neutral theme model. Other deferred areas include focus and
-gamepad navigation, input-consumption reporting, scrolling, docking/modal
-policy, animation, localization, accessibility metadata, and final Lua API
+gamepad navigation, input-consumption reporting, docking/modal policy,
+animation, localization, accessibility metadata, and final Lua API
 ergonomics/error reporting.

@@ -44,6 +44,17 @@ private:
     mutable rgui::SizeProposal proposal_;
     rgui::Size drawn_size_{};
 };
+
+class ScrollRecordingNode final : public rgui::Node {
+public:
+    void draw() override {
+        for (int index = 0; index < 20; ++index) ImGui::TextUnformatted("scrollable content");
+        scroll_max_y_ = ImGui::GetScrollMaxY();
+    }
+    [[nodiscard]] float scroll_max_y() const noexcept { return scroll_max_y_; }
+private:
+    float scroll_max_y_ = 0.0F;
+};
 } // namespace
 
 int main() {
@@ -156,6 +167,12 @@ int main() {
     try { static_cast<void>(rgui::Table(0)); } catch (const std::invalid_argument&) { rejected_empty_table = true; }
     expect(rejected_empty_table);
 
+    auto scroll_area = std::make_shared<rgui::ScrollArea>(rgui::Size{160.0F, 40.0F});
+    auto scroll_contents = std::make_shared<ScrollRecordingNode>();
+    scroll_area->append(scroll_contents);
+    root->append(scroll_area);
+    expect(scroll_area->size().width == 160.0F && scroll_area->size().height == 40.0F);
+
     ImGui::CreateContext();
     ImGui::GetIO().DisplaySize = {640.0F, 480.0F};
     unsigned char* pixels = nullptr;
@@ -180,6 +197,15 @@ int main() {
     expect(filled.width == available.width && filled.height == available.height);
     fill_panel->draw();
     ImGui::End();
+    ImGui::Begin("scroll area test");
+    scroll_area->draw();
+    ImGui::End();
+    ImGui::EndFrame();
+    ImGui::NewFrame();
+    ImGui::Begin("scroll area test");
+    scroll_area->draw();
+    ImGui::End();
+    expect(scroll_contents->scroll_max_y() > 0.0F);
     ImGui::EndFrame();
     ImGui::DestroyContext();
     return failures == 0 ? 0 : 1;

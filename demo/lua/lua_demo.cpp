@@ -59,6 +59,7 @@ int main() {
         local panel_text = rgui.text("This text is anchored to the panel's top-left.")
         local panel_action = rgui.button("Centred increment")
         local stats = rgui.table(2)
+        local log = rgui.scroll_area(0, 110)
         local stat_value = rgui.text("0")
         stats:set_header(1, "Item")
         stats:set_header(2, "Value")
@@ -66,6 +67,9 @@ int main() {
         stats:append(rgui.text("Table cells are Lua-built"))
         stats:append(rgui.text("Click count"))
         stats:append(stat_value)
+        for entry = 1, 16 do
+            log:append(rgui.text("Scrollable Lua log entry " .. entry))
+        end
         local clicks = 0
         local function increment(button)
             clicks = clicks + 1
@@ -79,6 +83,7 @@ int main() {
         root:append(status)
         root:append(action)
         root:append(stats)
+        root:append(log)
         panel:append(panel_text, "top_left", "top_left", 0, 0)
         --panel:append(panel_action, "top", "top", 0, 46)
         panel:append(

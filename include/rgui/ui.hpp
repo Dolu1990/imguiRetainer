@@ -129,6 +129,19 @@ private:
     std::vector<std::string> headers_;
 };
 
+/// Draws children in a bordered fixed-size region. Dear ImGui adds scrollbars
+/// automatically when the children's contents overflow this region.
+class ScrollArea final : public Container {
+public:
+    explicit ScrollArea(Size size);
+    [[nodiscard]] Size size() const noexcept { return size_; }
+    void set_size(Size size);
+    void draw() override;
+
+private:
+    Size size_;
+};
+
 enum class AnchorPoint {
     top_left, top, top_right,
     left, center, right,
