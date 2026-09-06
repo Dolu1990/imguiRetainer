@@ -48,21 +48,21 @@ int main() {
 
     sol::state lua;
     lua.open_libraries(sol::lib::base);
-    rgui::bind_lua(lua);
+    rgui::bindLua(lua);
 
     const sol::protected_function_result result = lua.safe_script(R"(
         local root = rgui.window("Lua-built retained rgui")
         local description = rgui.text("This retained UI was constructed and is updated by Lua.")
         local status = rgui.text("Button clicks: 0")
         local action = rgui.button("Increment")
-        local panel = rgui.anchored_panel("fill", 90)
+        local panel = rgui.anchoredPanel("fill", 90)
         local panel_text = rgui.text("This text is anchored to the panel's top-left.")
         local panel_action = rgui.button("Centred increment")
         local stats = rgui.table(2)
-        local log = rgui.scroll_area(0, 110)
+        local log = rgui.scrollArea(0, 110)
         local stat_value = rgui.text("0")
-        stats:set_header(1, "Item")
-        stats:set_header(2, "Value")
+        stats:setHeader(1, "Item")
+        stats:setHeader(2, "Value")
         stats:append(rgui.text("Retained nodes"))
         stats:append(rgui.text("Table cells are Lua-built"))
         stats:append(rgui.text("Click count"))
@@ -76,24 +76,24 @@ int main() {
             status.value = "Button clicks: " .. clicks
             stat_value.value = tostring(clicks)
         end
-        action:on_click(increment)
-        panel_action:on_click(increment)
+        action:onClick(increment)
+        panel_action:onClick(increment)
 
         root:append(description)
         root:append(status)
         root:append(action)
         root:append(stats)
         root:append(log)
-        panel:append(panel_text, "top_left", "top_left", 0, 0)
+        panel:append(panel_text, "topLeft", "topLeft", 0, 0)
         --panel:append(panel_action, "top", "top", 0, 46)
         panel:append(
           panel_action,
-          "top_left",  "top_left",  0, 32,
-          "top_right", "top_right", 0, 32
+          "topLeft",  "topLeft",  0, 32,
+          "topRight", "topRight", 0, 32
         )
         root:append(panel)
         tree = rgui.tree()
-        tree:set_root(root)
+        tree:setRoot(root)
     )", sol::script_pass_on_error);
     if (!result.valid()) {
         sol::error error = result;
@@ -114,7 +114,7 @@ int main() {
         ImGui::NewFrame();
 
         tree.draw();
-        static_cast<void>(tree.flush_events());
+        static_cast<void>(tree.flushEvents());
 
         ImGui::Render();
         int framebuffer_width = 0;

@@ -31,19 +31,19 @@ keeping its intrinsic height:
 
 ```cpp
 panel->append(std::make_shared<rgui::Button>("Continue"),
-    {rgui::AnchorPoint::top_left, rgui::AnchorPoint::top_left, 12.0F, 32.0F},
-    {rgui::AnchorPoint::top_right, rgui::AnchorPoint::top_right, -12.0F, 32.0F});
+    {rgui::AnchorPoint::topLeft, rgui::AnchorPoint::topLeft, 12.0F, 32.0F},
+    {rgui::AnchorPoint::topRight, rgui::AnchorPoint::topRight, -12.0F, 32.0F});
 ```
 
 The optional Lua binding exposes the same layout through anchor-point strings:
 
 ```lua
-local panel = rgui.anchored_panel(320, 100)
-panel:append(rgui.text("Status"), "top_left", "top_left", 12, 12)
+local panel = rgui.anchoredPanel(320, 100)
+panel:append(rgui.text("Status"), "topLeft", "topLeft", 12, 12)
 panel:append(rgui.button("Continue"), "top", "top", 0, 32)
 ```
 
-Lua accepts the same two-anchor form, or `set_second_anchor`, using another
+Lua accepts the same two-anchor form, or `setSecondAnchor`, using another
 `self`, `target`, and offset pair after the primary anchor arguments.
 
 Either Lua dimension can instead be `"fill"`, which resolves each frame to the
@@ -51,8 +51,8 @@ available content width or height of its containing ImGui window. It therefore
 tracks a resized window:
 
 ```lua
-local full_width = rgui.anchored_panel("fill", 100)
-local full_surface = rgui.anchored_panel("fill", "fill")
+local full_width = rgui.anchoredPanel("fill", 100)
+local full_surface = rgui.anchoredPanel("fill", "fill")
 ```
 
 ## Requirements

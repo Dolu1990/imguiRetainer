@@ -68,9 +68,9 @@ int main() {
 
     auto status = std::make_shared<rgui::Text>();
     const auto update_status = [&] {
-        status->set_value("Button clicks: " + std::to_string(clicks));
+        status->setValue("Button clicks: " + std::to_string(clicks));
     };
-    increment->set_on_click([&](rgui::Button&) {
+    increment->setOnClick([&](rgui::Button&) {
         ++clicks;
         update_status();
     });
@@ -79,12 +79,12 @@ int main() {
     auto generated_labels = std::make_shared<rgui::Stack>();
     std::mt19937 random_engine{std::random_device{}()};
     std::uniform_int_distribution<int> random_number{0, 9999};
-    add_random_label->set_on_click([&](rgui::Button&) {
+    add_random_label->setOnClick([&](rgui::Button&) {
         auto label = std::make_shared<rgui::Text>(
             "Random number: " + std::to_string(random_number(random_engine)));
         generated_labels->append(std::move(label));
     });
-    reset->set_on_click([&](rgui::Button&) {
+    reset->setOnClick([&](rgui::Button&) {
         clicks = 0;
         generated_labels->clear();
         update_status();
@@ -99,7 +99,7 @@ int main() {
     ui_window->append(generated_labels);
 
     rgui::UiTree tree;
-    tree.set_root(ui_window);
+    tree.setRoot(ui_window);
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -114,7 +114,7 @@ int main() {
 
         // Dispatch after rendering, when callbacks can safely change the
         // retained tree. Layout and rendering observe those changes next frame.
-        static_cast<void>(tree.flush_events());
+        static_cast<void>(tree.flushEvents());
 
         ImGui::Render();
         int framebuffer_width = 0;

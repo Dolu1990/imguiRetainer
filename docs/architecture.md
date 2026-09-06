@@ -58,10 +58,10 @@ specialized node that expresses ImGui's own begin/end protocol directly.
 `Table` is the first such composite: it owns a fixed positive number of
 columns, optional headers, and draws visible children as row-major cells.
 
-Button callbacks are queued and must be delivered by `UiTree::flush_events()`
+Button callbacks are queued and must be delivered by `UiTree::flushEvents()`
 at an application-selected safe point. A queued callback is discarded when its
 target is detached, reattached to another tree, or destroyed before dispatch.
-Callback errors, including Lua errors, propagate from `flush_events()` to the
+Callback errors, including Lua errors, propagate from `flushEvents()` to the
 embedding application. Structural changes (`append`, `remove`, or `clear`) are
 not permitted while `UiTree::draw()` is running.
 

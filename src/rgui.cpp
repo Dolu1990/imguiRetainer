@@ -15,8 +15,8 @@ std::string_view version() noexcept { return "0.1.0"; }
 namespace { std::atomic<NodeId> next_node_id{1}; }
 
 Node::Node() : id_(next_node_id.fetch_add(1, std::memory_order_relaxed)) {}
-void Node::set_visible(bool value) noexcept { visible_ = value; }
-void Node::set_enabled(bool value) noexcept { enabled_ = value; }
+void Node::setVisible(bool value) noexcept { visible_ = value; }
+void Node::setEnabled(bool value) noexcept { enabled_ = value; }
 Size Node::measure() const { return {}; }
 Size Node::measure(const SizeProposal&) const { return measure(); }
 void Node::draw(Size) { draw(); }
@@ -67,7 +67,7 @@ void Container::draw_children() {
 }
 void Container::draw() { draw_children(); }
 
-void Stack::set_axis(Axis value) noexcept { axis_ = value; }
+void Stack::setAxis(Axis value) noexcept { axis_ = value; }
 void Stack::draw() {
     bool first = true;
     for (const NodePtr& child : children_) {
@@ -79,7 +79,7 @@ void Stack::draw() {
 }
 
 Window::Window(std::string title) : title_(std::move(title)) {}
-void Window::set_title(std::string_view value) { title_ = value; }
+void Window::setTitle(std::string_view value) { title_ = value; }
 void Window::draw() {
     const std::string title = title_ + "###rgui-" + std::to_string(id());
     const bool draw_contents = ImGui::Begin(title.c_str());
@@ -90,7 +90,7 @@ void Window::draw() {
 Table::Table(std::size_t columns) : headers_(columns) {
     if (columns == 0) throw std::invalid_argument("rgui table requires at least one column");
 }
-void Table::set_header(std::size_t column, std::string_view value) {
+void Table::setHeader(std::size_t column, std::string_view value) {
     if (column >= columns()) throw std::out_of_range("rgui table column is out of range");
     headers_[column] = value;
 }
@@ -124,7 +124,7 @@ ScrollArea::ScrollArea(Size size) : size_(size) {
         throw std::invalid_argument("rgui scroll area size cannot be negative");
     }
 }
-void ScrollArea::set_size(Size size) {
+void ScrollArea::setSize(Size size) {
     if (size.width < 0.0F || size.height < 0.0F) {
         throw std::invalid_argument("rgui scroll area size cannot be negative");
     }
@@ -143,15 +143,15 @@ ImVec2 point_in_rect(AnchorPoint point, Size size) {
     const float center_x = size.width * 0.5F;
     const float center_y = size.height * 0.5F;
     switch (point) {
-    case AnchorPoint::top_left: return {0.0F, 0.0F};
+    case AnchorPoint::topLeft: return {0.0F, 0.0F};
     case AnchorPoint::top: return {center_x, 0.0F};
-    case AnchorPoint::top_right: return {size.width, 0.0F};
+    case AnchorPoint::topRight: return {size.width, 0.0F};
     case AnchorPoint::left: return {0.0F, center_y};
     case AnchorPoint::center: return {center_x, center_y};
     case AnchorPoint::right: return {size.width, center_y};
-    case AnchorPoint::bottom_left: return {0.0F, size.height};
+    case AnchorPoint::bottomLeft: return {0.0F, size.height};
     case AnchorPoint::bottom: return {center_x, size.height};
-    case AnchorPoint::bottom_right: return {size.width, size.height};
+    case AnchorPoint::bottomRight: return {size.width, size.height};
     }
     return {};
 }
@@ -179,13 +179,13 @@ void validate_size(Size size) {
 }
 } // namespace
 
-AnchoredPanel::AnchoredPanel(Size size, PanelExtent width_extent, PanelExtent height_extent)
-    : size_(size), width_extent_(width_extent), height_extent_(height_extent) {
+AnchoredPanel::AnchoredPanel(Size size, PanelExtent widthExtent, PanelExtent heightExtent)
+    : size_(size), width_extent_(widthExtent), height_extent_(heightExtent) {
     validate_size(size);
 }
-void AnchoredPanel::set_size(Size size) { validate_size(size); size_ = size; }
-void AnchoredPanel::set_width_extent(PanelExtent value) noexcept { width_extent_ = value; }
-void AnchoredPanel::set_height_extent(PanelExtent value) noexcept { height_extent_ = value; }
+void AnchoredPanel::setSize(Size size) { validate_size(size); size_ = size; }
+void AnchoredPanel::setWidthExtent(PanelExtent value) noexcept { width_extent_ = value; }
+void AnchoredPanel::setHeightExtent(PanelExtent value) noexcept { height_extent_ = value; }
 Size AnchoredPanel::measure() const {
     Size result = size_;
     if (!ImGui::GetCurrentContext()) return result;
@@ -220,12 +220,12 @@ void AnchoredPanel::clear() {
     Container::clear();
     anchors_.clear();
 }
-void AnchoredPanel::set_anchor(Node& child, Anchor anchor) { anchors_[child_index(child)].primary = anchor; }
+void AnchoredPanel::setAnchor(Node& child, Anchor anchor) { anchors_[child_index(child)].primary = anchor; }
 Anchor AnchoredPanel::anchor(const Node& child) const { return anchors_[child_index(child)].primary; }
-void AnchoredPanel::set_second_anchor(Node& child, std::optional<Anchor> anchor) {
+void AnchoredPanel::setSecondAnchor(Node& child, std::optional<Anchor> anchor) {
     anchors_[child_index(child)].secondary = anchor;
 }
-const std::optional<Anchor>& AnchoredPanel::second_anchor(const Node& child) const {
+const std::optional<Anchor>& AnchoredPanel::secondAnchor(const Node& child) const {
     return anchors_[child_index(child)].secondary;
 }
 void AnchoredPanel::draw() {
@@ -241,20 +241,20 @@ void AnchoredPanel::draw() {
             const Anchor& secondary = *child_anchors.secondary;
             const ImVec2 primary_target = point_in_rect(child_anchor.target, resolved_size);
             const ImVec2 secondary_target = point_in_rect(secondary.target, resolved_size);
-            proposal.width = proposed_axis(primary_target.x + child_anchor.offset_x,
-                                           secondary_target.x + secondary.offset_x,
+            proposal.width = proposed_axis(primary_target.x + child_anchor.offsetX,
+                                           secondary_target.x + secondary.offsetX,
                                            horizontal_fraction(child_anchor.self),
                                            horizontal_fraction(secondary.self));
-            proposal.height = proposed_axis(primary_target.y + child_anchor.offset_y,
-                                            secondary_target.y + secondary.offset_y,
+            proposal.height = proposed_axis(primary_target.y + child_anchor.offsetY,
+                                            secondary_target.y + secondary.offsetY,
                                             vertical_fraction(child_anchor.self),
                                             vertical_fraction(secondary.self));
         }
         const Size child_size = child.measure(proposal);
         const ImVec2 target = point_in_rect(child_anchor.target, resolved_size);
         const ImVec2 self = point_in_rect(child_anchor.self, child_size);
-        ImGui::SetCursorScreenPos({origin.x + target.x + child_anchor.offset_x - self.x,
-                                   origin.y + target.y + child_anchor.offset_y - self.y});
+        ImGui::SetCursorScreenPos({origin.x + target.x + child_anchor.offsetX - self.x,
+                                   origin.y + target.y + child_anchor.offsetY - self.y});
         draw_child(child, child_size);
     }
     ImGui::SetCursorScreenPos(origin);
@@ -262,15 +262,15 @@ void AnchoredPanel::draw() {
 }
 
 Text::Text(std::string value) : value_(std::move(value)) {}
-void Text::set_value(std::string_view value) { value_ = value; }
+void Text::setValue(std::string_view value) { value_ = value; }
 Size Text::measure() const {
     const ImVec2 size = ImGui::CalcTextSize(value_.data(), value_.data() + value_.size());
     return {size.x, size.y};
 }
 void Text::draw() { ImGui::TextUnformatted(value_.data(), value_.data() + value_.size()); }
 Button::Button(std::string label) : label_(std::move(label)) {}
-void Button::set_label(std::string_view value) { label_ = value; }
-void Button::set_on_click(std::function<void(Button&)> callback) { on_click_ = std::move(callback); }
+void Button::setLabel(std::string_view value) { label_ = value; }
+void Button::setOnClick(std::function<void(Button&)> callback) { on_click_ = std::move(callback); }
 void Button::activate() { if (visible() && enabled() && on_click_ && tree_) tree_->enqueue_event(weak_from_this(), attachment_generation_, on_click_); }
 Size Button::measure() const {
     const ImVec2 text_size = ImGui::CalcTextSize(label_.c_str(), nullptr, true);
@@ -293,7 +293,7 @@ void Button::draw(Size resolved_size) {
     if (clicked && enabled()) activate();
 }
 
-UiTree::~UiTree() noexcept { set_root(nullptr); }
+UiTree::~UiTree() noexcept { setRoot(nullptr); }
 UiTree::UiTree(UiTree&& other) noexcept
     : root_(std::move(other.root_)), events_(std::move(other.events_)) {
     if (root_) root_->set_tree_recursive(this);
@@ -305,7 +305,7 @@ UiTree::UiTree(UiTree&& other) noexcept
 }
 UiTree& UiTree::operator=(UiTree&& other) noexcept {
     if (this == &other) return *this;
-    set_root(nullptr);
+    setRoot(nullptr);
     events_.clear();
     root_ = std::move(other.root_);
     events_ = std::move(other.events_);
@@ -317,7 +317,7 @@ UiTree& UiTree::operator=(UiTree&& other) noexcept {
     }
     return *this;
 }
-void UiTree::set_root(NodePtr root) {
+void UiTree::setRoot(NodePtr root) {
     if (root && root->parent()) throw std::logic_error("rgui root already has a parent");
     if (root && root->tree_ && root->tree_ != this) throw std::logic_error("rgui root already belongs to a tree");
     if (root_ == root) return;
@@ -333,7 +333,7 @@ void UiTree::draw() {
     ImGui::PushID(id.c_str()); root_->draw(); ImGui::PopID();
 }
 void UiTree::enqueue_event(const std::weak_ptr<Node>& target, std::uint64_t attachment_generation, std::function<void(Button&)> callback) { events_.push_back({target, attachment_generation, std::move(callback)}); }
-std::size_t UiTree::flush_events() {
+std::size_t UiTree::flushEvents() {
     std::vector<Event> events = std::move(events_); events_.clear(); std::size_t invoked = 0;
     for (Event& event : events) {
         const std::shared_ptr<Node> target = event.target.lock();

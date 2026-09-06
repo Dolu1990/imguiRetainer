@@ -23,20 +23,20 @@ const char* axis_to_string(Axis value) noexcept {
 }
 
 AnchorPoint anchor_point_from_string(const std::string& value) {
-    if (value == "top_left") return AnchorPoint::top_left;
+    if (value == "topLeft") return AnchorPoint::topLeft;
     if (value == "top") return AnchorPoint::top;
-    if (value == "top_right") return AnchorPoint::top_right;
+    if (value == "topRight") return AnchorPoint::topRight;
     if (value == "left") return AnchorPoint::left;
     if (value == "center") return AnchorPoint::center;
     if (value == "right") return AnchorPoint::right;
-    if (value == "bottom_left") return AnchorPoint::bottom_left;
+    if (value == "bottomLeft") return AnchorPoint::bottomLeft;
     if (value == "bottom") return AnchorPoint::bottom;
-    if (value == "bottom_right") return AnchorPoint::bottom_right;
-    throw std::invalid_argument("anchor point must be top_left, top, top_right, left, center, right, bottom_left, bottom, or bottom_right");
+    if (value == "bottomRight") return AnchorPoint::bottomRight;
+    throw std::invalid_argument("anchor point must be topLeft, top, topRight, left, center, right, bottomLeft, bottom, or bottomRight");
 }
 
-Anchor anchor_from_lua(const std::string& self, const std::string& target, float offset_x, float offset_y) {
-    return {anchor_point_from_string(self), anchor_point_from_string(target), offset_x, offset_y};
+Anchor anchor_from_lua(const std::string& self, const std::string& target, float offsetX, float offsetY) {
+    return {anchor_point_from_string(self), anchor_point_from_string(target), offsetX, offsetY};
 }
 
 std::pair<float, PanelExtent> panel_extent_from_lua(const sol::object& value) {
@@ -58,13 +58,13 @@ NodePtr node_from_lua(const sol::object& value) {
 
 } // namespace
 
-void bind_lua(sol::state_view state) {
+void bindLua(sol::state_view state) {
     sol::table api = state["rgui"].get_or_create<sol::table>();
 
     state.new_usertype<Node>("rgui.Node", sol::no_constructor,
         "id", &Node::id,
-        "visible", sol::property(&Node::visible, &Node::set_visible),
-        "enabled", sol::property(&Node::enabled, &Node::set_enabled));
+        "visible", sol::property(&Node::visible, &Node::setVisible),
+        "enabled", sol::property(&Node::enabled, &Node::setEnabled));
     state.new_usertype<Container>("rgui.Container", sol::no_constructor,
         sol::base_classes, sol::bases<Node>(),
         "append", [](Container& parent, const sol::object& child) { parent.append(node_from_lua(child)); },
@@ -73,18 +73,18 @@ void bind_lua(sol::state_view state) {
         sol::base_classes, sol::bases<Container, Node>(),
         "axis", sol::property(
             [](const Stack& stack) { return axis_to_string(stack.axis()); },
-            [](Stack& stack, const std::string& value) { stack.set_axis(axis_from_string(value)); }));
+            [](Stack& stack, const std::string& value) { stack.setAxis(axis_from_string(value)); }));
     state.new_usertype<Window>("rgui.Window", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>(),
         "title", sol::property(
             [](const Window& window) { return std::string(window.title()); },
-            [](Window& window, const std::string& value) { window.set_title(value); }));
+            [](Window& window, const std::string& value) { window.setTitle(value); }));
     state.new_usertype<Table>("rgui.Table", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>(),
         "columns", &Table::columns,
-        "set_header", [](Table& table, std::size_t column, const std::string& value) {
+        "setHeader", [](Table& table, std::size_t column, const std::string& value) {
             if (column == 0) throw std::invalid_argument("table column indices start at 1");
-            table.set_header(column - 1, value);
+            table.setHeader(column - 1, value);
         },
         "header", [](const Table& table, std::size_t column) {
             if (column == 0) throw std::invalid_argument("table column indices start at 1");
@@ -92,48 +92,48 @@ void bind_lua(sol::state_view state) {
         });
     state.new_usertype<ScrollArea>("rgui.ScrollArea", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>(),
-        "set_size", [](ScrollArea& area, float width, float height) {
-            area.set_size(Size{width, height});
+        "setSize", [](ScrollArea& area, float width, float height) {
+            area.setSize(Size{width, height});
         });
     state.new_usertype<AnchoredPanel>("rgui.AnchoredPanel", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>(),
         "append", sol::overload(
             [](AnchoredPanel& panel, const sol::object& child) { panel.append(node_from_lua(child)); },
             [](AnchoredPanel& panel, const sol::object& child, const std::string& self,
-               const std::string& target, float offset_x, float offset_y) {
-                panel.append(node_from_lua(child), anchor_from_lua(self, target, offset_x, offset_y));
+               const std::string& target, float offsetX, float offsetY) {
+                panel.append(node_from_lua(child), anchor_from_lua(self, target, offsetX, offsetY));
             },
-            [](AnchoredPanel& panel, const sol::object& child, const std::string& primary_self,
-               const std::string& primary_target, float primary_offset_x, float primary_offset_y,
-               const std::string& secondary_self, const std::string& secondary_target,
-               float secondary_offset_x, float secondary_offset_y) {
+            [](AnchoredPanel& panel, const sol::object& child, const std::string& primarySelf,
+               const std::string& primaryTarget, float primaryOffsetX, float primaryOffsetY,
+               const std::string& secondarySelf, const std::string& secondaryTarget,
+               float secondaryOffsetX, float secondaryOffsetY) {
                 panel.append(node_from_lua(child),
-                             anchor_from_lua(primary_self, primary_target, primary_offset_x, primary_offset_y),
-                             anchor_from_lua(secondary_self, secondary_target, secondary_offset_x, secondary_offset_y));
+                             anchor_from_lua(primarySelf, primaryTarget, primaryOffsetX, primaryOffsetY),
+                             anchor_from_lua(secondarySelf, secondaryTarget, secondaryOffsetX, secondaryOffsetY));
             }),
-        "set_anchor", [](AnchoredPanel& panel, const sol::object& child, const std::string& self,
-                           const std::string& target, float offset_x, float offset_y) {
-            panel.set_anchor(*node_from_lua(child), anchor_from_lua(self, target, offset_x, offset_y));
+        "setAnchor", [](AnchoredPanel& panel, const sol::object& child, const std::string& self,
+                           const std::string& target, float offsetX, float offsetY) {
+            panel.setAnchor(*node_from_lua(child), anchor_from_lua(self, target, offsetX, offsetY));
         },
-        "set_second_anchor", [](AnchoredPanel& panel, const sol::object& child, const std::string& self,
-                                  const std::string& target, float offset_x, float offset_y) {
-            panel.set_second_anchor(*node_from_lua(child), anchor_from_lua(self, target, offset_x, offset_y));
+        "setSecondAnchor", [](AnchoredPanel& panel, const sol::object& child, const std::string& self,
+                                  const std::string& target, float offsetX, float offsetY) {
+            panel.setSecondAnchor(*node_from_lua(child), anchor_from_lua(self, target, offsetX, offsetY));
         },
-        "clear_second_anchor", [](AnchoredPanel& panel, const sol::object& child) {
-            panel.set_second_anchor(*node_from_lua(child), std::nullopt);
+        "clearSecondAnchor", [](AnchoredPanel& panel, const sol::object& child) {
+            panel.setSecondAnchor(*node_from_lua(child), std::nullopt);
         });
     state.new_usertype<Text>("rgui.Text", sol::no_constructor,
         sol::base_classes, sol::bases<Node>(),
         "value", sol::property(
             [](const Text& text) { return std::string(text.value()); },
-            [](Text& text, const std::string& value) { text.set_value(value); }));
+            [](Text& text, const std::string& value) { text.setValue(value); }));
     state.new_usertype<Button>("rgui.Button", sol::no_constructor,
         sol::base_classes, sol::bases<Node>(),
         "label", sol::property(
             [](const Button& button) { return std::string(button.label()); },
-            [](Button& button, const std::string& value) { button.set_label(value); }),
-        "on_click", [](Button& button, sol::protected_function callback) {
-            button.set_on_click([callback = std::move(callback)](Button& clicked) mutable {
+            [](Button& button, const std::string& value) { button.setLabel(value); }),
+        "onClick", [](Button& button, sol::protected_function callback) {
+            button.setOnClick([callback = std::move(callback)](Button& clicked) mutable {
                 sol::protected_function_result result = callback(clicked);
                 if (!result.valid()) {
                     sol::error error = result;
@@ -143,21 +143,21 @@ void bind_lua(sol::state_view state) {
         },
         "activate", &Button::activate);
     state.new_usertype<UiTree>("rgui.UiTree", sol::constructors<UiTree()>(),
-        "set_root", [](UiTree& tree, const sol::object& root) { tree.set_root(node_from_lua(root)); },
+        "setRoot", [](UiTree& tree, const sol::object& root) { tree.setRoot(node_from_lua(root)); },
         "draw", &UiTree::draw,
-        "flush_events", &UiTree::flush_events);
+        "flushEvents", &UiTree::flushEvents);
 
     api.set_function("stack", [](const std::string& axis) {
         return std::make_shared<Stack>(axis_from_string(axis));
     });
-    api.set_function("anchored_panel", [](const sol::object& width, const sol::object& height) {
+    api.set_function("anchoredPanel", [](const sol::object& width, const sol::object& height) {
         const auto [width_value, width_extent] = panel_extent_from_lua(width);
         const auto [height_value, height_extent] = panel_extent_from_lua(height);
         return std::make_shared<AnchoredPanel>(Size{width_value, height_value}, width_extent, height_extent);
     });
     api.set_function("window", [](const std::string& title) { return std::make_shared<Window>(title); });
     api.set_function("table", [](std::size_t columns) { return std::make_shared<Table>(columns); });
-    api.set_function("scroll_area", [](float width, float height) {
+    api.set_function("scrollArea", [](float width, float height) {
         return std::make_shared<ScrollArea>(Size{width, height});
     });
     api.set_function("text", [](const std::string& value) { return std::make_shared<Text>(value); });

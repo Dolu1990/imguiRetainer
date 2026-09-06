@@ -45,8 +45,8 @@ public:
     [[nodiscard]] Node* parent() const noexcept { return parent_; }
     [[nodiscard]] bool visible() const noexcept { return visible_; }
     [[nodiscard]] bool enabled() const noexcept { return enabled_; }
-    void set_visible(bool value) noexcept;
-    void set_enabled(bool value) noexcept;
+    void setVisible(bool value) noexcept;
+    void setEnabled(bool value) noexcept;
     /// Returns this node's preferred size in the current Dear ImGui context.
     /// Custom nodes that participate in an AnchoredPanel should override this.
     [[nodiscard]] virtual Size measure() const;
@@ -96,7 +96,7 @@ enum class Axis { horizontal, vertical };
 class Stack : public Container {
 public:
     explicit Stack(Axis axis = Axis::vertical) noexcept : axis_(axis) {}
-    void set_axis(Axis value) noexcept;
+    void setAxis(Axis value) noexcept;
     [[nodiscard]] Axis axis() const noexcept { return axis_; }
     void draw() override;
 
@@ -108,7 +108,7 @@ class Window final : public Container {
 public:
     explicit Window(std::string title = {});
     [[nodiscard]] std::string_view title() const noexcept { return title_; }
-    void set_title(std::string_view value);
+    void setTitle(std::string_view value);
     void draw() override;
 private:
     std::string title_;
@@ -121,7 +121,7 @@ class Table final : public Container {
 public:
     explicit Table(std::size_t columns);
     [[nodiscard]] std::size_t columns() const noexcept { return headers_.size(); }
-    void set_header(std::size_t column, std::string_view value);
+    void setHeader(std::size_t column, std::string_view value);
     [[nodiscard]] std::string_view header(std::size_t column) const;
     void draw() override;
 
@@ -135,7 +135,7 @@ class ScrollArea final : public Container {
 public:
     explicit ScrollArea(Size size);
     [[nodiscard]] Size size() const noexcept { return size_; }
-    void set_size(Size size);
+    void setSize(Size size);
     void draw() override;
 
 private:
@@ -143,9 +143,9 @@ private:
 };
 
 enum class AnchorPoint {
-    top_left, top, top_right,
+    topLeft, top, topRight,
     left, center, right,
-    bottom_left, bottom, bottom_right,
+    bottomLeft, bottom, bottomRight,
 };
 
 /// Positions a child relative to an AnchoredPanel. Both points refer to their
@@ -154,10 +154,10 @@ enum class AnchorPoint {
 /// AnchoredPanel child; differing self points on an axis derive a size
 /// proposal for that axis.
 struct Anchor {
-    AnchorPoint self = AnchorPoint::top_left;
-    AnchorPoint target = AnchorPoint::top_left;
-    float offset_x = 0.0F;
-    float offset_y = 0.0F;
+    AnchorPoint self = AnchorPoint::topLeft;
+    AnchorPoint target = AnchorPoint::topLeft;
+    float offsetX = 0.0F;
+    float offsetY = 0.0F;
 };
 
 /// How an AnchoredPanel resolves one of its dimensions.
@@ -169,14 +169,14 @@ enum class PanelExtent { fixed, fill };
 /// measuring and drawing itself.
 class AnchoredPanel final : public Container {
 public:
-    explicit AnchoredPanel(Size size, PanelExtent width_extent = PanelExtent::fixed,
-                           PanelExtent height_extent = PanelExtent::fixed);
+    explicit AnchoredPanel(Size size, PanelExtent widthExtent = PanelExtent::fixed,
+                           PanelExtent heightExtent = PanelExtent::fixed);
     [[nodiscard]] Size size() const noexcept { return size_; }
-    void set_size(Size size);
-    [[nodiscard]] PanelExtent width_extent() const noexcept { return width_extent_; }
-    [[nodiscard]] PanelExtent height_extent() const noexcept { return height_extent_; }
-    void set_width_extent(PanelExtent value) noexcept;
-    void set_height_extent(PanelExtent value) noexcept;
+    void setSize(Size size);
+    [[nodiscard]] PanelExtent widthExtent() const noexcept { return width_extent_; }
+    [[nodiscard]] PanelExtent heightExtent() const noexcept { return height_extent_; }
+    void setWidthExtent(PanelExtent value) noexcept;
+    void setHeightExtent(PanelExtent value) noexcept;
     [[nodiscard]] Size measure() const override;
 
     void append(NodePtr child) override;
@@ -184,10 +184,10 @@ public:
     void append(NodePtr child, Anchor primary_anchor, Anchor secondary_anchor);
     [[nodiscard]] NodePtr remove(Node& child) override;
     void clear() override;
-    void set_anchor(Node& child, Anchor anchor);
+    void setAnchor(Node& child, Anchor anchor);
     [[nodiscard]] Anchor anchor(const Node& child) const;
-    void set_second_anchor(Node& child, std::optional<Anchor> anchor);
-    [[nodiscard]] const std::optional<Anchor>& second_anchor(const Node& child) const;
+    void setSecondAnchor(Node& child, std::optional<Anchor> anchor);
+    [[nodiscard]] const std::optional<Anchor>& secondAnchor(const Node& child) const;
     void draw() override;
 
 private:
@@ -206,7 +206,7 @@ class Text final : public Node {
 public:
     explicit Text(std::string value = {});
     [[nodiscard]] std::string_view value() const noexcept { return value_; }
-    void set_value(std::string_view value);
+    void setValue(std::string_view value);
     [[nodiscard]] Size measure() const override;
     void draw() override;
 private:
@@ -217,8 +217,8 @@ class Button final : public Node {
 public:
     explicit Button(std::string label = {});
     [[nodiscard]] std::string_view label() const noexcept { return label_; }
-    void set_label(std::string_view value);
-    void set_on_click(std::function<void(Button&)> callback);
+    void setLabel(std::string_view value);
+    void setOnClick(std::function<void(Button&)> callback);
     void activate();
     [[nodiscard]] Size measure() const override;
     [[nodiscard]] Size measure(const SizeProposal& proposal) const override;
@@ -239,11 +239,11 @@ public:
     UiTree(UiTree&& other) noexcept;
     UiTree& operator=(UiTree&& other) noexcept;
 
-    void set_root(NodePtr root);
+    void setRoot(NodePtr root);
     [[nodiscard]] const NodePtr& root() const noexcept { return root_; }
     void draw();
-    [[nodiscard]] std::size_t flush_events();
-    [[nodiscard]] std::size_t pending_event_count() const noexcept { return events_.size(); }
+    [[nodiscard]] std::size_t flushEvents();
+    [[nodiscard]] std::size_t pendingEventCount() const noexcept { return events_.size(); }
 private:
     friend class Button;
     struct Event {

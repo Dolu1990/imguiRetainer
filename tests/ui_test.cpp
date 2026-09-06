@@ -66,75 +66,75 @@ int main() {
     root->append(first);
     root->append(second);
     rgui::UiTree tree;
-    tree.set_root(root);
+    tree.setRoot(root);
     expect(first->parent() == root.get());
 
     bool activated = false;
-    first->set_on_click([&activated](rgui::Button&) { activated = true; });
+    first->setOnClick([&activated](rgui::Button&) { activated = true; });
     first->activate();
     expect(!activated);
-    expect(tree.flush_events() == 1);
+    expect(tree.flushEvents() == 1);
     expect(activated);
     activated = false;
-    first->set_enabled(false);
+    first->setEnabled(false);
     first->activate();
-    expect(tree.flush_events() == 0);
+    expect(tree.flushEvents() == 0);
 
     bool snapshot_callback = false;
-    first->set_enabled(true);
-    first->set_on_click([&snapshot_callback](rgui::Button&) { snapshot_callback = true; });
+    first->setEnabled(true);
+    first->setOnClick([&snapshot_callback](rgui::Button&) { snapshot_callback = true; });
     first->activate();
-    first->set_on_click([](rgui::Button&) {});
-    first->set_label("changed while queued");
-    expect(tree.flush_events() == 1);
+    first->setOnClick([](rgui::Button&) {});
+    first->setLabel("changed while queued");
+    expect(tree.flushEvents() == 1);
     expect(snapshot_callback);
 
     auto self_removing = std::make_shared<rgui::Button>("remove me");
     root->append(self_removing);
-    self_removing->set_on_click([&root](rgui::Button& button) { (void)root->remove(button); });
+    self_removing->setOnClick([&root](rgui::Button& button) { (void)root->remove(button); });
     self_removing->activate();
-    expect(tree.flush_events() == 1);
+    expect(tree.flushEvents() == 1);
     expect(self_removing->parent() == nullptr);
 
     auto discarded = std::make_shared<rgui::Button>("discarded");
     bool discarded_called = false;
-    discarded->set_on_click([&discarded_called](rgui::Button&) { discarded_called = true; });
+    discarded->setOnClick([&discarded_called](rgui::Button&) { discarded_called = true; });
     root->append(discarded);
     discarded->activate();
     const rgui::NodePtr removed_discarded = root->remove(*discarded);
-    expect(tree.flush_events() == 0);
+    expect(tree.flushEvents() == 0);
     expect(!discarded_called);
 
     int deferred_dispatches = 0;
-    first->set_on_click([&deferred_dispatches](rgui::Button& button) {
+    first->setOnClick([&deferred_dispatches](rgui::Button& button) {
         ++deferred_dispatches;
         if (deferred_dispatches == 1) button.activate();
     });
     first->activate();
-    expect(tree.flush_events() == 1);
-    expect(tree.pending_event_count() == 1);
-    expect(tree.flush_events() == 1);
+    expect(tree.flushEvents() == 1);
+    expect(tree.pendingEventCount() == 1);
+    expect(tree.flushEvents() == 1);
     expect(deferred_dispatches == 2);
 
     auto transferable_root = std::make_shared<rgui::Window>("transferable");
     {
         rgui::UiTree temporary_tree;
-        temporary_tree.set_root(transferable_root);
+        temporary_tree.setRoot(transferable_root);
     }
     rgui::UiTree replacement_tree;
-    replacement_tree.set_root(transferable_root);
+    replacement_tree.setRoot(transferable_root);
     expect(replacement_tree.root() == transferable_root);
 
     auto moved_root = std::make_shared<rgui::Window>("moved");
     auto moved_button = std::make_shared<rgui::Button>("moved button");
     bool moved_callback = false;
-    moved_button->set_on_click([&moved_callback](rgui::Button&) { moved_callback = true; });
+    moved_button->setOnClick([&moved_callback](rgui::Button&) { moved_callback = true; });
     moved_root->append(moved_button);
     rgui::UiTree original_tree;
-    original_tree.set_root(moved_root);
+    original_tree.setRoot(moved_root);
     moved_button->activate();
     rgui::UiTree moved_tree = std::move(original_tree);
-    expect(moved_tree.flush_events() == 1 && moved_callback);
+    expect(moved_tree.flushEvents() == 1 && moved_callback);
 
     const rgui::NodePtr detached = root->remove(*second);
     expect(detached.get() == second.get());
@@ -150,15 +150,15 @@ int main() {
     panel->append(panel_origin);
     panel->append(centred, {rgui::AnchorPoint::top, rgui::AnchorPoint::top});
     panel->append(stretched,
-                  {rgui::AnchorPoint::top_left, rgui::AnchorPoint::top_left, 10.0F, 15.0F},
-                  {rgui::AnchorPoint::top_right, rgui::AnchorPoint::top_right, -10.0F, 15.0F});
+                  {rgui::AnchorPoint::topLeft, rgui::AnchorPoint::topLeft, 10.0F, 15.0F},
+                  {rgui::AnchorPoint::topRight, rgui::AnchorPoint::topRight, -10.0F, 15.0F});
     root->append(panel);
     expect(panel->measure().width == 100.0F && panel->measure().height == 50.0F);
     expect(panel->anchor(*centred).self == rgui::AnchorPoint::top);
 
     auto table = std::make_shared<rgui::Table>(2);
-    table->set_header(0, "Name");
-    table->set_header(1, "Value");
+    table->setHeader(0, "Name");
+    table->setHeader(1, "Value");
     table->append(std::make_shared<rgui::Text>("Health"));
     table->append(std::make_shared<rgui::Text>("100"));
     root->append(table);
@@ -167,11 +167,11 @@ int main() {
     try { static_cast<void>(rgui::Table(0)); } catch (const std::invalid_argument&) { rejected_empty_table = true; }
     expect(rejected_empty_table);
 
-    auto scroll_area = std::make_shared<rgui::ScrollArea>(rgui::Size{160.0F, 40.0F});
+    auto scrollArea = std::make_shared<rgui::ScrollArea>(rgui::Size{160.0F, 40.0F});
     auto scroll_contents = std::make_shared<ScrollRecordingNode>();
-    scroll_area->append(scroll_contents);
-    root->append(scroll_area);
-    expect(scroll_area->size().width == 160.0F && scroll_area->size().height == 40.0F);
+    scrollArea->append(scroll_contents);
+    root->append(scrollArea);
+    expect(scrollArea->size().width == 160.0F && scrollArea->size().height == 40.0F);
 
     ImGui::CreateContext();
     ImGui::GetIO().DisplaySize = {640.0F, 480.0F};
@@ -198,12 +198,12 @@ int main() {
     fill_panel->draw();
     ImGui::End();
     ImGui::Begin("scroll area test");
-    scroll_area->draw();
+    scrollArea->draw();
     ImGui::End();
     ImGui::EndFrame();
     ImGui::NewFrame();
     ImGui::Begin("scroll area test");
-    scroll_area->draw();
+    scrollArea->draw();
     ImGui::End();
     expect(scroll_contents->scroll_max_y() > 0.0F);
     ImGui::EndFrame();
