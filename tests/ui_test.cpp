@@ -4,6 +4,8 @@
 
 #include <memory>
 #include <stdexcept>
+#include <type_traits>
+#include <utility>
 
 namespace {
 int failures = 0;
@@ -26,6 +28,8 @@ private:
 } // namespace
 
 int main() {
+    static_assert(!std::is_copy_constructible_v<rgui::UiTree>);
+    static_assert(!std::is_copy_assignable_v<rgui::UiTree>);
     auto root = std::make_shared<rgui::Window>("test window");
     auto first = std::make_shared<rgui::Button>("first");
     auto second = std::make_shared<rgui::Text>("second");
@@ -82,6 +86,26 @@ int main() {
     expect(tree.flush_events() == 1);
     expect(deferred_dispatches == 2);
 
+    auto transferable_root = std::make_shared<rgui::Window>("transferable");
+    {
+        rgui::UiTree temporary_tree;
+        temporary_tree.set_root(transferable_root);
+    }
+    rgui::UiTree replacement_tree;
+    replacement_tree.set_root(transferable_root);
+    expect(replacement_tree.root() == transferable_root);
+
+    auto moved_root = std::make_shared<rgui::Window>("moved");
+    auto moved_button = std::make_shared<rgui::Button>("moved button");
+    bool moved_callback = false;
+    moved_button->set_on_click([&moved_callback](rgui::Button&) { moved_callback = true; });
+    moved_root->append(moved_button);
+    rgui::UiTree original_tree;
+    original_tree.set_root(moved_root);
+    moved_button->activate();
+    rgui::UiTree moved_tree = std::move(original_tree);
+    expect(moved_tree.flush_events() == 1 && moved_callback);
+
     const rgui::NodePtr detached = root->remove(*second);
     expect(detached.get() == second.get());
     expect(second->parent() == nullptr);
@@ -110,6 +134,14 @@ int main() {
     tree.draw();
     expect(centred->position().x - panel_origin->position().x == 40.0F);
     expect(centred->position().y == panel_origin->position().y);
+    ImGui::Begin("fill panel test");
+    auto fill_panel = std::make_shared<rgui::AnchoredPanel>(
+        rgui::Size{0.0F, 0.0F}, rgui::PanelExtent::fill, rgui::PanelExtent::fill);
+    const rgui::Size available{ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y};
+    const rgui::Size filled = fill_panel->measure();
+    expect(filled.width == available.width && filled.height == available.height);
+    fill_panel->draw();
+    ImGui::End();
     ImGui::EndFrame();
     ImGui::DestroyContext();
     return failures == 0 ? 0 : 1;

@@ -60,6 +60,7 @@ private:
 class Container : public Node {
 public:
     ~Container() override;
+    /// Structural changes must occur outside UiTree::draw().
     virtual void append(NodePtr child);
     [[nodiscard]] virtual NodePtr remove(Node& child);
     virtual void clear();
@@ -114,14 +115,24 @@ struct Anchor {
     float offset_y = 0.0F;
 };
 
-/// A fixed-size retained layout surface. It owns each child's placement while
-/// the child remains responsible for measuring and drawing itself.
+/// How an AnchoredPanel resolves one of its dimensions.
+enum class PanelExtent { fixed, fill };
+
+/// A retained layout surface. Fixed dimensions use the supplied Size; fill
+/// dimensions use the current Dear ImGui content region when drawn.
+/// It owns each child's placement while the child remains responsible for
+/// measuring and drawing itself.
 class AnchoredPanel final : public Container {
 public:
-    explicit AnchoredPanel(Size size);
+    explicit AnchoredPanel(Size size, PanelExtent width_extent = PanelExtent::fixed,
+                           PanelExtent height_extent = PanelExtent::fixed);
     [[nodiscard]] Size size() const noexcept { return size_; }
     void set_size(Size size);
-    [[nodiscard]] Size measure() const override { return size_; }
+    [[nodiscard]] PanelExtent width_extent() const noexcept { return width_extent_; }
+    [[nodiscard]] PanelExtent height_extent() const noexcept { return height_extent_; }
+    void set_width_extent(PanelExtent value) noexcept;
+    void set_height_extent(PanelExtent value) noexcept;
+    [[nodiscard]] Size measure() const override;
 
     void append(NodePtr child) override;
     void append(NodePtr child, Anchor anchor);
@@ -134,6 +145,8 @@ public:
 private:
     [[nodiscard]] std::size_t child_index(const Node& child) const;
     Size size_;
+    PanelExtent width_extent_;
+    PanelExtent height_extent_;
     std::vector<Anchor> anchors_;
 };
 
@@ -165,6 +178,13 @@ private:
 /// Owns one root and draws it into the caller-owned current Dear ImGui frame.
 class UiTree final {
 public:
+    UiTree() = default;
+    ~UiTree() noexcept;
+    UiTree(const UiTree&) = delete;
+    UiTree& operator=(const UiTree&) = delete;
+    UiTree(UiTree&& other) noexcept;
+    UiTree& operator=(UiTree&& other) noexcept;
+
     void set_root(NodePtr root);
     [[nodiscard]] const NodePtr& root() const noexcept { return root_; }
     void draw();

@@ -48,15 +48,19 @@ IDs—not labels or child positions—provide stable ImGui identity.
 
 Containers own their children. A vertical `Stack` uses ImGui's normal flow; a
 horizontal `Stack` uses `SameLine()` between visible children. `AnchoredPanel`
-is a fixed-size surface: it owns each child's anchor metadata, uses the
-child's `measure()` result to resolve its position, and then draws the child
-at that cursor position. A real overlay, table, popup, or other composite
+owns each child's anchor metadata, uses the child's `measure()` result to
+resolve its position, and then draws the child at that cursor position. Its
+dimensions can be fixed or fill either available ImGui content axis. A real
+overlay, table, popup, or other composite
 should be a specialized node that expresses ImGui's own begin/end protocol
 directly.
 
 Button callbacks are queued and must be delivered by `UiTree::flush_events()`
 at an application-selected safe point. A queued callback is discarded when its
 target is detached, reattached to another tree, or destroyed before dispatch.
+Callback errors, including Lua errors, propagate from `flush_events()` to the
+embedding application. Structural changes (`append`, `remove`, or `clear`) are
+not permitted while `UiTree::draw()` is running.
 
 ## Build checks
 

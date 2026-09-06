@@ -10,8 +10,8 @@ deferred design decisions.
 
 ## Anchored layout
 
-`AnchoredPanel` is a fixed-size layout surface. It stores anchors on behalf of
-its children, so reusable nodes do not need position or alignment state:
+`AnchoredPanel` stores anchors on behalf of its children, so reusable nodes do
+not need position or alignment state. Its dimensions are fixed by default:
 
 ```cpp
 auto panel = std::make_shared<rgui::AnchoredPanel>(rgui::Size{320.0F, 100.0F});
@@ -31,6 +31,15 @@ The optional Lua binding exposes the same layout through anchor-point strings:
 local panel = rgui.anchored_panel(320, 100)
 panel:append(rgui.text("Status"), "top_left", "top_left", 12, 12)
 panel:append(rgui.button("Continue"), "top", "top", 0, 32)
+```
+
+Either Lua dimension can instead be `"fill"`, which resolves each frame to the
+available content width or height of its containing ImGui window. It therefore
+tracks a resized window:
+
+```lua
+local full_width = rgui.anchored_panel("fill", 100)
+local full_surface = rgui.anchored_panel("fill", "fill")
 ```
 
 ## Requirements

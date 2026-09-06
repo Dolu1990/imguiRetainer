@@ -7,6 +7,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace rgui {
 namespace {
@@ -36,6 +37,12 @@ AnchorPoint anchor_point_from_string(const std::string& value) {
 
 Anchor anchor_from_lua(const std::string& self, const std::string& target, float offset_x, float offset_y) {
     return {anchor_point_from_string(self), anchor_point_from_string(target), offset_x, offset_y};
+}
+
+std::pair<float, PanelExtent> panel_extent_from_lua(const sol::object& value) {
+    if (value.is<float>()) return {value.as<float>(), PanelExtent::fixed};
+    if (value.is<std::string>() && value.as<std::string>() == "fill") return {0.0F, PanelExtent::fill};
+    throw std::invalid_argument("panel extent must be a number or the string 'fill'");
 }
 
 NodePtr node_from_lua(const sol::object& value) {
@@ -97,7 +104,7 @@ void bind_lua(sol::state_view state) {
                 sol::protected_function_result result = callback(clicked);
                 if (!result.valid()) {
                     sol::error error = result;
-                    (void)error;
+                    throw std::runtime_error(error.what());
                 }
             });
         },
@@ -110,8 +117,10 @@ void bind_lua(sol::state_view state) {
     api.set_function("stack", [](const std::string& axis) {
         return std::make_shared<Stack>(axis_from_string(axis));
     });
-    api.set_function("anchored_panel", [](float width, float height) {
-        return std::make_shared<AnchoredPanel>(Size{width, height});
+    api.set_function("anchored_panel", [](const sol::object& width, const sol::object& height) {
+        const auto [width_value, width_extent] = panel_extent_from_lua(width);
+        const auto [height_value, height_extent] = panel_extent_from_lua(height);
+        return std::make_shared<AnchoredPanel>(Size{width_value, height_value}, width_extent, height_extent);
     });
     api.set_function("window", [](const std::string& title) { return std::make_shared<Window>(title); });
     api.set_function("text", [](const std::string& value) { return std::make_shared<Text>(value); });

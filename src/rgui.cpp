@@ -6,6 +6,7 @@
 #include <atomic>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace rgui {
 
@@ -104,8 +105,21 @@ void validate_size(Size size) {
 }
 } // namespace
 
-AnchoredPanel::AnchoredPanel(Size size) : size_(size) { validate_size(size); }
+AnchoredPanel::AnchoredPanel(Size size, PanelExtent width_extent, PanelExtent height_extent)
+    : size_(size), width_extent_(width_extent), height_extent_(height_extent) {
+    validate_size(size);
+}
 void AnchoredPanel::set_size(Size size) { validate_size(size); size_ = size; }
+void AnchoredPanel::set_width_extent(PanelExtent value) noexcept { width_extent_ = value; }
+void AnchoredPanel::set_height_extent(PanelExtent value) noexcept { height_extent_ = value; }
+Size AnchoredPanel::measure() const {
+    Size result = size_;
+    if (!ImGui::GetCurrentContext()) return result;
+    const ImVec2 available = ImGui::GetContentRegionAvail();
+    if (width_extent_ == PanelExtent::fill) result.width = available.x;
+    if (height_extent_ == PanelExtent::fill) result.height = available.y;
+    return result;
+}
 void AnchoredPanel::append(NodePtr child) { append(std::move(child), {}); }
 void AnchoredPanel::append(NodePtr child, Anchor anchor) {
     Container::append(std::move(child));
@@ -132,19 +146,20 @@ void AnchoredPanel::set_anchor(Node& child, Anchor anchor) { anchors_[child_inde
 Anchor AnchoredPanel::anchor(const Node& child) const { return anchors_[child_index(child)]; }
 void AnchoredPanel::draw() {
     const ImVec2 origin = ImGui::GetCursorScreenPos();
+    const Size resolved_size = measure();
     for (std::size_t index = 0; index < children_.size(); ++index) {
         Node& child = *children_[index];
         if (!child.visible()) continue;
         const Anchor child_anchor = anchors_[index];
         const Size child_size = child.measure();
-        const ImVec2 target = point_in_rect(child_anchor.target, size_);
+        const ImVec2 target = point_in_rect(child_anchor.target, resolved_size);
         const ImVec2 self = point_in_rect(child_anchor.self, child_size);
         ImGui::SetCursorScreenPos({origin.x + target.x + child_anchor.offset_x - self.x,
                                    origin.y + target.y + child_anchor.offset_y - self.y});
         draw_child(child);
     }
     ImGui::SetCursorScreenPos(origin);
-    ImGui::Dummy({size_.width, size_.height});
+    ImGui::Dummy({resolved_size.width, resolved_size.height});
 }
 
 Text::Text(std::string value) : value_(std::move(value)) {}
@@ -170,6 +185,30 @@ void Button::draw() {
     if (clicked && enabled()) activate();
 }
 
+UiTree::~UiTree() noexcept { set_root(nullptr); }
+UiTree::UiTree(UiTree&& other) noexcept
+    : root_(std::move(other.root_)), events_(std::move(other.events_)) {
+    if (root_) root_->set_tree_recursive(this);
+    for (Event& event : events_) {
+        if (const std::shared_ptr<Node> target = event.target.lock()) {
+            event.attachment_generation = target->attachment_generation_;
+        }
+    }
+}
+UiTree& UiTree::operator=(UiTree&& other) noexcept {
+    if (this == &other) return *this;
+    set_root(nullptr);
+    events_.clear();
+    root_ = std::move(other.root_);
+    events_ = std::move(other.events_);
+    if (root_) root_->set_tree_recursive(this);
+    for (Event& event : events_) {
+        if (const std::shared_ptr<Node> target = event.target.lock()) {
+            event.attachment_generation = target->attachment_generation_;
+        }
+    }
+    return *this;
+}
 void UiTree::set_root(NodePtr root) {
     if (root && root->parent()) throw std::logic_error("rgui root already has a parent");
     if (root && root->tree_ && root->tree_ != this) throw std::logic_error("rgui root already belongs to a tree");
