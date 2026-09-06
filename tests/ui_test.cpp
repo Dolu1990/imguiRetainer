@@ -25,6 +25,25 @@ private:
     rgui::Size size_;
     ImVec2 position_{};
 };
+
+class ProposalRecordingNode final : public rgui::Node {
+public:
+    [[nodiscard]] rgui::Size measure() const override { return {10.0F, 8.0F}; }
+    [[nodiscard]] rgui::Size measure(const rgui::SizeProposal& proposal) const override {
+        proposal_ = proposal;
+        rgui::Size result = measure();
+        if (proposal.width) result.width = *proposal.width;
+        if (proposal.height) result.height = *proposal.height;
+        return result;
+    }
+    void draw() override {}
+    void draw(rgui::Size resolved_size) override { drawn_size_ = resolved_size; }
+    [[nodiscard]] const rgui::SizeProposal& proposal() const noexcept { return proposal_; }
+    [[nodiscard]] rgui::Size drawn_size() const noexcept { return drawn_size_; }
+private:
+    mutable rgui::SizeProposal proposal_;
+    rgui::Size drawn_size_{};
+};
 } // namespace
 
 int main() {
@@ -116,8 +135,12 @@ int main() {
     auto panel = std::make_shared<rgui::AnchoredPanel>(rgui::Size{100.0F, 50.0F});
     auto panel_origin = std::make_shared<RecordingNode>(rgui::Size{1.0F, 1.0F});
     auto centred = std::make_shared<RecordingNode>(rgui::Size{20.0F, 10.0F});
+    auto stretched = std::make_shared<ProposalRecordingNode>();
     panel->append(panel_origin);
     panel->append(centred, {rgui::AnchorPoint::top, rgui::AnchorPoint::top});
+    panel->append(stretched,
+                  {rgui::AnchorPoint::top_left, rgui::AnchorPoint::top_left, 10.0F, 15.0F},
+                  {rgui::AnchorPoint::top_right, rgui::AnchorPoint::top_right, -10.0F, 15.0F});
     root->append(panel);
     expect(panel->measure().width == 100.0F && panel->measure().height == 50.0F);
     expect(panel->anchor(*centred).self == rgui::AnchorPoint::top);
@@ -145,6 +168,10 @@ int main() {
     tree.draw();
     expect(centred->position().x - panel_origin->position().x == 40.0F);
     expect(centred->position().y == panel_origin->position().y);
+    expect(stretched->proposal().width && *stretched->proposal().width == 80.0F);
+    expect(!stretched->proposal().height);
+    expect(stretched->drawn_size().width == 80.0F && stretched->drawn_size().height == 8.0F);
+    expect(first->measure(rgui::SizeProposal{120.0F, std::nullopt}).width == 120.0F);
     ImGui::Begin("fill panel test");
     auto fill_panel = std::make_shared<rgui::AnchoredPanel>(
         rgui::Size{0.0F, 0.0F}, rgui::PanelExtent::fill, rgui::PanelExtent::fill);

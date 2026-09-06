@@ -96,10 +96,25 @@ void bind_lua(sol::state_view state) {
             [](AnchoredPanel& panel, const sol::object& child, const std::string& self,
                const std::string& target, float offset_x, float offset_y) {
                 panel.append(node_from_lua(child), anchor_from_lua(self, target, offset_x, offset_y));
+            },
+            [](AnchoredPanel& panel, const sol::object& child, const std::string& primary_self,
+               const std::string& primary_target, float primary_offset_x, float primary_offset_y,
+               const std::string& secondary_self, const std::string& secondary_target,
+               float secondary_offset_x, float secondary_offset_y) {
+                panel.append(node_from_lua(child),
+                             anchor_from_lua(primary_self, primary_target, primary_offset_x, primary_offset_y),
+                             anchor_from_lua(secondary_self, secondary_target, secondary_offset_x, secondary_offset_y));
             }),
         "set_anchor", [](AnchoredPanel& panel, const sol::object& child, const std::string& self,
                            const std::string& target, float offset_x, float offset_y) {
             panel.set_anchor(*node_from_lua(child), anchor_from_lua(self, target, offset_x, offset_y));
+        },
+        "set_second_anchor", [](AnchoredPanel& panel, const sol::object& child, const std::string& self,
+                                  const std::string& target, float offset_x, float offset_y) {
+            panel.set_second_anchor(*node_from_lua(child), anchor_from_lua(self, target, offset_x, offset_y));
+        },
+        "clear_second_anchor", [](AnchoredPanel& panel, const sol::object& child) {
+            panel.set_second_anchor(*node_from_lua(child), std::nullopt);
         });
     state.new_usertype<Text>("rgui.Text", sol::no_constructor,
         sol::base_classes, sol::bases<Node>(),

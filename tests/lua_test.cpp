@@ -23,6 +23,7 @@ int main() {
         stats:append(rgui.text("100"))
         panel:append(label, "top_left", "top_left", 12, 12)
         panel:append(action, "top", "top", 0, 32)
+        panel:set_second_anchor(action, "top_right", "top_right", -12, 32)
     )", sol::script_pass_on_error);
     if (!result.valid()) return 1;
 
@@ -37,6 +38,7 @@ int main() {
     const std::shared_ptr<rgui::Button> action = lua["action"];
     const std::shared_ptr<rgui::Table> stats = lua["stats"];
     const rgui::Anchor anchor = panel->anchor(*action);
+    const std::optional<rgui::Anchor>& second_anchor = panel->second_anchor(*action);
     const std::shared_ptr<rgui::Button> failing_button = lua["failing_button"];
     rgui::UiTree callback_tree;
     callback_tree.set_root(failing_button);
@@ -52,6 +54,9 @@ int main() {
                    full_panel->height_extent() == rgui::PanelExtent::fill &&
                    anchor.self == rgui::AnchorPoint::top && anchor.target == rgui::AnchorPoint::top &&
                    anchor.offset_x == 0.0F && anchor.offset_y == 32.0F
+                   && second_anchor && second_anchor->self == rgui::AnchorPoint::top_right &&
+                   second_anchor->target == rgui::AnchorPoint::top_right &&
+                   second_anchor->offset_x == -12.0F && second_anchor->offset_y == 32.0F
                    && stats->columns() == 2 && stats->header(0) == "Stat" && stats->header(1) == "Value"
                    && stats->children().size() == 2
                    && callback_error_propagated

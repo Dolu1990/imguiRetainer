@@ -80,8 +80,12 @@ int main() {
         root:append(action)
         root:append(stats)
         panel:append(panel_text, "top_left", "top_left", 0, 0)
-        panel:append(panel_action, "top", "top", 0, 46)
-        --panel:append(panel_action, "top_left", "top_left", 0, 0)
+        --panel:append(panel_action, "top", "top", 0, 46)
+        panel:append(
+          panel_action,
+          "top_left",  "top_left",  0, 32,
+          "top_right", "top_right", 0, 32
+        )
         root:append(panel)
         tree = rgui.tree()
         tree:set_root(root)

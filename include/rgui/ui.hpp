@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -16,6 +17,13 @@ using NodeId = std::uint64_t;
 struct Size {
     float width = 0.0F;
     float height = 0.0F;
+};
+
+/// A non-binding size offered to a node by its parent. An absent axis leaves
+/// that axis at the node's preferred size.
+struct SizeProposal {
+    std::optional<float> width;
+    std::optional<float> height;
 };
 
 class Container;
@@ -42,7 +50,13 @@ public:
     /// Returns this node's preferred size in the current Dear ImGui context.
     /// Custom nodes that participate in an AnchoredPanel should override this.
     [[nodiscard]] virtual Size measure() const;
+    /// Returns the size this node accepts for a parent-proposed size. The
+    /// default implementation preserves intrinsic sizing by ignoring it.
+    [[nodiscard]] virtual Size measure(const SizeProposal& proposal) const;
     virtual void draw() = 0;
+    /// Draws using the size accepted by measure(SizeProposal). The default
+    /// preserves existing custom nodes by calling draw().
+    virtual void draw(Size resolved_size);
 
 private:
     friend class Container;
@@ -69,6 +83,7 @@ public:
 
 protected:
     void draw_child(Node& child);
+    void draw_child(Node& child, Size resolved_size);
     void draw_children();
     void set_tree_recursive(UiTree* tree) noexcept override;
     std::vector<NodePtr> children_;
@@ -122,7 +137,9 @@ enum class AnchorPoint {
 
 /// Positions a child relative to an AnchoredPanel. Both points refer to their
 /// respective rectangles; the child is placed so these points coincide before
-/// the pixel offset is applied.
+/// the pixel offset is applied. A second anchor can be supplied to an
+/// AnchoredPanel child; differing self points on an axis derive a size
+/// proposal for that axis.
 struct Anchor {
     AnchorPoint self = AnchorPoint::top_left;
     AnchorPoint target = AnchorPoint::top_left;
@@ -151,10 +168,13 @@ public:
 
     void append(NodePtr child) override;
     void append(NodePtr child, Anchor anchor);
+    void append(NodePtr child, Anchor primary_anchor, Anchor secondary_anchor);
     [[nodiscard]] NodePtr remove(Node& child) override;
     void clear() override;
     void set_anchor(Node& child, Anchor anchor);
     [[nodiscard]] Anchor anchor(const Node& child) const;
+    void set_second_anchor(Node& child, std::optional<Anchor> anchor);
+    [[nodiscard]] const std::optional<Anchor>& second_anchor(const Node& child) const;
     void draw() override;
 
 private:
@@ -162,7 +182,11 @@ private:
     Size size_;
     PanelExtent width_extent_;
     PanelExtent height_extent_;
-    std::vector<Anchor> anchors_;
+    struct ChildAnchors {
+        Anchor primary;
+        std::optional<Anchor> secondary;
+    };
+    std::vector<ChildAnchors> anchors_;
 };
 
 class Text final : public Node {
@@ -184,7 +208,9 @@ public:
     void set_on_click(std::function<void(Button&)> callback);
     void activate();
     [[nodiscard]] Size measure() const override;
+    [[nodiscard]] Size measure(const SizeProposal& proposal) const override;
     void draw() override;
+    void draw(Size resolved_size) override;
 private:
     std::string label_;
     std::function<void(Button&)> on_click_;

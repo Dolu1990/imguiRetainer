@@ -23,7 +23,17 @@ panel->append(std::make_shared<rgui::Button>("Continue"), {
 
 The panel asks each child for `measure()` before resolving the anchor. Built-in
 text and buttons measure themselves; a custom node should override `measure()`
-when it will be placed in an anchored panel.
+when it will be placed in an anchored panel. A child may also have a second
+anchor. Where its two `self` points differ on an axis, the panel offers the
+intervening size on that axis through `measure(SizeProposal)`. Nodes may accept
+or ignore that offer. For example, this stretches a button horizontally while
+keeping its intrinsic height:
+
+```cpp
+panel->append(std::make_shared<rgui::Button>("Continue"),
+    {rgui::AnchorPoint::top_left, rgui::AnchorPoint::top_left, 12.0F, 32.0F},
+    {rgui::AnchorPoint::top_right, rgui::AnchorPoint::top_right, -12.0F, 32.0F});
+```
 
 The optional Lua binding exposes the same layout through anchor-point strings:
 
@@ -32,6 +42,9 @@ local panel = rgui.anchored_panel(320, 100)
 panel:append(rgui.text("Status"), "top_left", "top_left", 12, 12)
 panel:append(rgui.button("Continue"), "top", "top", 0, 32)
 ```
+
+Lua accepts the same two-anchor form, or `set_second_anchor`, using another
+`self`, `target`, and offset pair after the primary anchor arguments.
 
 Either Lua dimension can instead be `"fill"`, which resolves each frame to the
 available content width or height of its containing ImGui window. It therefore

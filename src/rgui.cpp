@@ -18,6 +18,8 @@ Node::Node() : id_(next_node_id.fetch_add(1, std::memory_order_relaxed)) {}
 void Node::set_visible(bool value) noexcept { visible_ = value; }
 void Node::set_enabled(bool value) noexcept { enabled_ = value; }
 Size Node::measure() const { return {}; }
+Size Node::measure(const SizeProposal&) const { return measure(); }
+void Node::draw(Size) { draw(); }
 void Node::set_tree_recursive(UiTree* tree) noexcept { if (tree_ != tree) { tree_ = tree; ++attachment_generation_; } }
 
 Container::~Container() { for (const NodePtr& child : children_) child->parent_ = nullptr; }
@@ -52,6 +54,11 @@ void Container::draw_child(Node& child) {
     if (!child.visible()) return;
     const std::string id = std::to_string(child.id());
     ImGui::PushID(id.c_str()); child.draw(); ImGui::PopID();
+}
+void Container::draw_child(Node& child, Size resolved_size) {
+    if (!child.visible()) return;
+    const std::string id = std::to_string(child.id());
+    ImGui::PushID(id.c_str()); child.draw(resolved_size); ImGui::PopID();
 }
 void Container::draw_children() {
     for (const NodePtr& child : children_) {
@@ -130,6 +137,22 @@ ImVec2 point_in_rect(AnchorPoint point, Size size) {
     return {};
 }
 
+float horizontal_fraction(AnchorPoint point) {
+    return point_in_rect(point, {1.0F, 1.0F}).x;
+}
+
+float vertical_fraction(AnchorPoint point) {
+    return point_in_rect(point, {1.0F, 1.0F}).y;
+}
+
+std::optional<float> proposed_axis(float primary_target, float secondary_target,
+                                   float primary_self, float secondary_self) {
+    const float denominator = secondary_self - primary_self;
+    if (denominator == 0.0F) return std::nullopt;
+    const float result = (secondary_target - primary_target) / denominator;
+    return result >= 0.0F ? std::optional<float>{result} : std::nullopt;
+}
+
 void validate_size(Size size) {
     if (size.width < 0.0F || size.height < 0.0F) {
         throw std::invalid_argument("rgui panel size cannot be negative");
@@ -155,7 +178,11 @@ Size AnchoredPanel::measure() const {
 void AnchoredPanel::append(NodePtr child) { append(std::move(child), {}); }
 void AnchoredPanel::append(NodePtr child, Anchor anchor) {
     Container::append(std::move(child));
-    anchors_.push_back(anchor);
+    anchors_.push_back({anchor, std::nullopt});
+}
+void AnchoredPanel::append(NodePtr child, Anchor primary_anchor, Anchor secondary_anchor) {
+    Container::append(std::move(child));
+    anchors_.push_back({primary_anchor, secondary_anchor});
 }
 std::size_t AnchoredPanel::child_index(const Node& child) const {
     const auto position = std::find_if(children_.begin(), children_.end(), [&child](const NodePtr& candidate) {
@@ -174,21 +201,42 @@ void AnchoredPanel::clear() {
     Container::clear();
     anchors_.clear();
 }
-void AnchoredPanel::set_anchor(Node& child, Anchor anchor) { anchors_[child_index(child)] = anchor; }
-Anchor AnchoredPanel::anchor(const Node& child) const { return anchors_[child_index(child)]; }
+void AnchoredPanel::set_anchor(Node& child, Anchor anchor) { anchors_[child_index(child)].primary = anchor; }
+Anchor AnchoredPanel::anchor(const Node& child) const { return anchors_[child_index(child)].primary; }
+void AnchoredPanel::set_second_anchor(Node& child, std::optional<Anchor> anchor) {
+    anchors_[child_index(child)].secondary = anchor;
+}
+const std::optional<Anchor>& AnchoredPanel::second_anchor(const Node& child) const {
+    return anchors_[child_index(child)].secondary;
+}
 void AnchoredPanel::draw() {
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const Size resolved_size = measure();
     for (std::size_t index = 0; index < children_.size(); ++index) {
         Node& child = *children_[index];
         if (!child.visible()) continue;
-        const Anchor child_anchor = anchors_[index];
-        const Size child_size = child.measure();
+        const ChildAnchors& child_anchors = anchors_[index];
+        const Anchor& child_anchor = child_anchors.primary;
+        SizeProposal proposal;
+        if (child_anchors.secondary) {
+            const Anchor& secondary = *child_anchors.secondary;
+            const ImVec2 primary_target = point_in_rect(child_anchor.target, resolved_size);
+            const ImVec2 secondary_target = point_in_rect(secondary.target, resolved_size);
+            proposal.width = proposed_axis(primary_target.x + child_anchor.offset_x,
+                                           secondary_target.x + secondary.offset_x,
+                                           horizontal_fraction(child_anchor.self),
+                                           horizontal_fraction(secondary.self));
+            proposal.height = proposed_axis(primary_target.y + child_anchor.offset_y,
+                                            secondary_target.y + secondary.offset_y,
+                                            vertical_fraction(child_anchor.self),
+                                            vertical_fraction(secondary.self));
+        }
+        const Size child_size = child.measure(proposal);
         const ImVec2 target = point_in_rect(child_anchor.target, resolved_size);
         const ImVec2 self = point_in_rect(child_anchor.self, child_size);
         ImGui::SetCursorScreenPos({origin.x + target.x + child_anchor.offset_x - self.x,
                                    origin.y + target.y + child_anchor.offset_y - self.y});
-        draw_child(child);
+        draw_child(child, child_size);
     }
     ImGui::SetCursorScreenPos(origin);
     ImGui::Dummy({resolved_size.width, resolved_size.height});
@@ -210,9 +258,18 @@ Size Button::measure() const {
     const ImVec2 padding = ImGui::GetStyle().FramePadding;
     return {text_size.x + padding.x * 2.0F, ImGui::GetFrameHeight()};
 }
+Size Button::measure(const SizeProposal& proposal) const {
+    Size result = measure();
+    if (proposal.width && *proposal.width > 0.0F) result.width = *proposal.width;
+    if (proposal.height && *proposal.height > 0.0F) result.height = *proposal.height;
+    return result;
+}
 void Button::draw() {
+    draw(measure());
+}
+void Button::draw(Size resolved_size) {
     if (!enabled()) ImGui::BeginDisabled();
-    const bool clicked = ImGui::Button(label_.c_str());
+    const bool clicked = ImGui::Button(label_.c_str(), {resolved_size.width, resolved_size.height});
     if (!enabled()) ImGui::EndDisabled();
     if (clicked && enabled()) activate();
 }

@@ -48,13 +48,15 @@ IDs—not labels or child positions—provide stable ImGui identity.
 
 Containers own their children. A vertical `Stack` uses ImGui's normal flow; a
 horizontal `Stack` uses `SameLine()` between visible children. `AnchoredPanel`
-owns each child's anchor metadata, uses the child's `measure()` result to
-resolve its position, and then draws the child at that cursor position. Its
-dimensions can be fixed or fill either available ImGui content axis. A real
-overlay, table, popup, or other composite should be a specialized node that
-expresses ImGui's own begin/end protocol directly. `Table` is the first such
-composite: it owns a fixed positive number of columns, optional headers, and
-draws visible children as row-major cells.
+owns each child's anchor metadata. A primary anchor positions the child; an
+optional secondary anchor derives a non-binding `SizeProposal` on each axis
+where the two child anchor points differ. The child accepts, adjusts, or
+ignores the proposal through `measure(SizeProposal)`, then is drawn with its
+accepted size. Its dimensions can be fixed or fill either available ImGui
+content axis. A real overlay, table, popup, or other composite should be a
+specialized node that expresses ImGui's own begin/end protocol directly.
+`Table` is the first such composite: it owns a fixed positive number of
+columns, optional headers, and draws visible children as row-major cells.
 
 Button callbacks are queued and must be delivered by `UiTree::flush_events()`
 at an application-selected safe point. A queued callback is discarded when its
