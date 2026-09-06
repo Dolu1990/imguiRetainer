@@ -3,10 +3,35 @@
 `rgui` is a C++23 retainer-mode GUI library intended to render with
 [Dear ImGui](https://github.com/ocornut/imgui) and expose a clean Lua API via
 [sol2](https://github.com/ThePhD/sol2). It currently provides a deliberately
-small retained-mode vertical slice: `UiTree`, containers, text, buttons,
+small retained-mode vertical slice: `UiTree`, flow and anchored containers, text, buttons,
 direct Dear ImGui drawing, and optional Lua bindings. See
 [docs/architecture.md](docs/architecture.md) for the supported boundary and
 deferred design decisions.
+
+## Anchored layout
+
+`AnchoredPanel` is a fixed-size layout surface. It stores anchors on behalf of
+its children, so reusable nodes do not need position or alignment state:
+
+```cpp
+auto panel = std::make_shared<rgui::AnchoredPanel>(rgui::Size{320.0F, 100.0F});
+panel->append(std::make_shared<rgui::Text>("Status"));
+panel->append(std::make_shared<rgui::Button>("Continue"), {
+    rgui::AnchorPoint::top, rgui::AnchorPoint::top, 0.0F, 32.0F,
+});
+```
+
+The panel asks each child for `measure()` before resolving the anchor. Built-in
+text and buttons measure themselves; a custom node should override `measure()`
+when it will be placed in an anchored panel.
+
+The optional Lua binding exposes the same layout through anchor-point strings:
+
+```lua
+local panel = rgui.anchored_panel(320, 100)
+panel:append(rgui.text("Status"), "top_left", "top_left", 12, 12)
+panel:append(rgui.button("Continue"), "top", "top", 0, 32)
+```
 
 ## Requirements
 

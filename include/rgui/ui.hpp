@@ -12,6 +12,12 @@ namespace rgui {
 
 using NodeId = std::uint64_t;
 
+/// A size in Dear ImGui pixels.
+struct Size {
+    float width = 0.0F;
+    float height = 0.0F;
+};
+
 class Container;
 class Button;
 class Node;
@@ -33,6 +39,9 @@ public:
     [[nodiscard]] bool enabled() const noexcept { return enabled_; }
     void set_visible(bool value) noexcept;
     void set_enabled(bool value) noexcept;
+    /// Returns this node's preferred size in the current Dear ImGui context.
+    /// Custom nodes that participate in an AnchoredPanel should override this.
+    [[nodiscard]] virtual Size measure() const;
     virtual void draw() = 0;
 
 private:
@@ -51,9 +60,9 @@ private:
 class Container : public Node {
 public:
     ~Container() override;
-    void append(NodePtr child);
-    [[nodiscard]] NodePtr remove(Node& child);
-    void clear();
+    virtual void append(NodePtr child);
+    [[nodiscard]] virtual NodePtr remove(Node& child);
+    virtual void clear();
     [[nodiscard]] const std::vector<NodePtr>& children() const noexcept { return children_; }
     void draw() override;
 
@@ -89,11 +98,51 @@ private:
     std::string title_;
 };
 
+enum class AnchorPoint {
+    top_left, top, top_right,
+    left, center, right,
+    bottom_left, bottom, bottom_right,
+};
+
+/// Positions a child relative to an AnchoredPanel. Both points refer to their
+/// respective rectangles; the child is placed so these points coincide before
+/// the pixel offset is applied.
+struct Anchor {
+    AnchorPoint self = AnchorPoint::top_left;
+    AnchorPoint target = AnchorPoint::top_left;
+    float offset_x = 0.0F;
+    float offset_y = 0.0F;
+};
+
+/// A fixed-size retained layout surface. It owns each child's placement while
+/// the child remains responsible for measuring and drawing itself.
+class AnchoredPanel final : public Container {
+public:
+    explicit AnchoredPanel(Size size);
+    [[nodiscard]] Size size() const noexcept { return size_; }
+    void set_size(Size size);
+    [[nodiscard]] Size measure() const override { return size_; }
+
+    void append(NodePtr child) override;
+    void append(NodePtr child, Anchor anchor);
+    [[nodiscard]] NodePtr remove(Node& child) override;
+    void clear() override;
+    void set_anchor(Node& child, Anchor anchor);
+    [[nodiscard]] Anchor anchor(const Node& child) const;
+    void draw() override;
+
+private:
+    [[nodiscard]] std::size_t child_index(const Node& child) const;
+    Size size_;
+    std::vector<Anchor> anchors_;
+};
+
 class Text final : public Node {
 public:
     explicit Text(std::string value = {});
     [[nodiscard]] std::string_view value() const noexcept { return value_; }
     void set_value(std::string_view value);
+    [[nodiscard]] Size measure() const override;
     void draw() override;
 private:
     std::string value_;
@@ -106,6 +155,7 @@ public:
     void set_label(std::string_view value);
     void set_on_click(std::function<void(Button&)> callback);
     void activate();
+    [[nodiscard]] Size measure() const override;
     void draw() override;
 private:
     std::string label_;

@@ -21,9 +21,27 @@ const char* axis_to_string(Axis value) noexcept {
     return value == Axis::horizontal ? "horizontal" : "vertical";
 }
 
+AnchorPoint anchor_point_from_string(const std::string& value) {
+    if (value == "top_left") return AnchorPoint::top_left;
+    if (value == "top") return AnchorPoint::top;
+    if (value == "top_right") return AnchorPoint::top_right;
+    if (value == "left") return AnchorPoint::left;
+    if (value == "center") return AnchorPoint::center;
+    if (value == "right") return AnchorPoint::right;
+    if (value == "bottom_left") return AnchorPoint::bottom_left;
+    if (value == "bottom") return AnchorPoint::bottom;
+    if (value == "bottom_right") return AnchorPoint::bottom_right;
+    throw std::invalid_argument("anchor point must be top_left, top, top_right, left, center, right, bottom_left, bottom, or bottom_right");
+}
+
+Anchor anchor_from_lua(const std::string& self, const std::string& target, float offset_x, float offset_y) {
+    return {anchor_point_from_string(self), anchor_point_from_string(target), offset_x, offset_y};
+}
+
 NodePtr node_from_lua(const sol::object& value) {
     if (value.is<std::shared_ptr<Window>>()) return value.as<std::shared_ptr<Window>>();
     if (value.is<std::shared_ptr<Stack>>()) return value.as<std::shared_ptr<Stack>>();
+    if (value.is<std::shared_ptr<AnchoredPanel>>()) return value.as<std::shared_ptr<AnchoredPanel>>();
     if (value.is<std::shared_ptr<Text>>()) return value.as<std::shared_ptr<Text>>();
     if (value.is<std::shared_ptr<Button>>()) return value.as<std::shared_ptr<Button>>();
     throw std::invalid_argument("expected an rgui node");
@@ -52,6 +70,18 @@ void bind_lua(sol::state_view state) {
         "title", sol::property(
             [](const Window& window) { return std::string(window.title()); },
             [](Window& window, const std::string& value) { window.set_title(value); }));
+    state.new_usertype<AnchoredPanel>("rgui.AnchoredPanel", sol::no_constructor,
+        sol::base_classes, sol::bases<Container, Node>(),
+        "append", sol::overload(
+            [](AnchoredPanel& panel, const sol::object& child) { panel.append(node_from_lua(child)); },
+            [](AnchoredPanel& panel, const sol::object& child, const std::string& self,
+               const std::string& target, float offset_x, float offset_y) {
+                panel.append(node_from_lua(child), anchor_from_lua(self, target, offset_x, offset_y));
+            }),
+        "set_anchor", [](AnchoredPanel& panel, const sol::object& child, const std::string& self,
+                           const std::string& target, float offset_x, float offset_y) {
+            panel.set_anchor(*node_from_lua(child), anchor_from_lua(self, target, offset_x, offset_y));
+        });
     state.new_usertype<Text>("rgui.Text", sol::no_constructor,
         sol::base_classes, sol::bases<Node>(),
         "value", sol::property(
@@ -79,6 +109,9 @@ void bind_lua(sol::state_view state) {
 
     api.set_function("stack", [](const std::string& axis) {
         return std::make_shared<Stack>(axis_from_string(axis));
+    });
+    api.set_function("anchored_panel", [](float width, float height) {
+        return std::make_shared<AnchoredPanel>(Size{width, height});
     });
     api.set_function("window", [](const std::string& title) { return std::make_shared<Window>(title); });
     api.set_function("text", [](const std::string& value) { return std::make_shared<Text>(value); });

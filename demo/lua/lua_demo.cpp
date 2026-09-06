@@ -55,15 +55,23 @@ int main() {
         local description = rgui.text("This retained UI was constructed and is updated by Lua.")
         local status = rgui.text("Button clicks: 0")
         local action = rgui.button("Increment")
+        local panel = rgui.anchored_panel(360, 90)
+        local panel_text = rgui.text("This text is anchored to the panel's top-left.")
+        local panel_action = rgui.button("Centred increment")
         local clicks = 0
-        action:on_click(function(button)
+        local function increment(button)
             clicks = clicks + 1
             status.value = "Button clicks: " .. clicks
-        end)
+        end
+        action:on_click(increment)
+        panel_action:on_click(increment)
 
         root:append(description)
         root:append(status)
         root:append(action)
+        panel:append(panel_text, "top_left", "top_left", 12, 12)
+        panel:append(panel_action, "top", "top", 0, 46)
+        root:append(panel)
         tree = rgui.tree()
         tree:set_root(root)
     )", sol::script_pass_on_error);

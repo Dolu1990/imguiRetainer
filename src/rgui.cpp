@@ -16,6 +16,7 @@ namespace { std::atomic<NodeId> next_node_id{1}; }
 Node::Node() : id_(next_node_id.fetch_add(1, std::memory_order_relaxed)) {}
 void Node::set_visible(bool value) noexcept { visible_ = value; }
 void Node::set_enabled(bool value) noexcept { enabled_ = value; }
+Size Node::measure() const { return {}; }
 void Node::set_tree_recursive(UiTree* tree) noexcept { if (tree_ != tree) { tree_ = tree; ++attachment_generation_; } }
 
 Container::~Container() { for (const NodePtr& child : children_) child->parent_ = nullptr; }
@@ -77,13 +78,91 @@ void Window::draw() {
     if (draw_contents) draw_children();
     ImGui::End();
 }
+
+namespace {
+ImVec2 point_in_rect(AnchorPoint point, Size size) {
+    const float center_x = size.width * 0.5F;
+    const float center_y = size.height * 0.5F;
+    switch (point) {
+    case AnchorPoint::top_left: return {0.0F, 0.0F};
+    case AnchorPoint::top: return {center_x, 0.0F};
+    case AnchorPoint::top_right: return {size.width, 0.0F};
+    case AnchorPoint::left: return {0.0F, center_y};
+    case AnchorPoint::center: return {center_x, center_y};
+    case AnchorPoint::right: return {size.width, center_y};
+    case AnchorPoint::bottom_left: return {0.0F, size.height};
+    case AnchorPoint::bottom: return {center_x, size.height};
+    case AnchorPoint::bottom_right: return {size.width, size.height};
+    }
+    return {};
+}
+
+void validate_size(Size size) {
+    if (size.width < 0.0F || size.height < 0.0F) {
+        throw std::invalid_argument("rgui panel size cannot be negative");
+    }
+}
+} // namespace
+
+AnchoredPanel::AnchoredPanel(Size size) : size_(size) { validate_size(size); }
+void AnchoredPanel::set_size(Size size) { validate_size(size); size_ = size; }
+void AnchoredPanel::append(NodePtr child) { append(std::move(child), {}); }
+void AnchoredPanel::append(NodePtr child, Anchor anchor) {
+    Container::append(std::move(child));
+    anchors_.push_back(anchor);
+}
+std::size_t AnchoredPanel::child_index(const Node& child) const {
+    const auto position = std::find_if(children_.begin(), children_.end(), [&child](const NodePtr& candidate) {
+        return candidate.get() == &child;
+    });
+    if (position == children_.end()) throw std::logic_error("rgui node is not a child of this anchored panel");
+    return static_cast<std::size_t>(position - children_.begin());
+}
+NodePtr AnchoredPanel::remove(Node& child) {
+    const std::size_t index = child_index(child);
+    NodePtr result = Container::remove(child);
+    anchors_.erase(anchors_.begin() + static_cast<std::ptrdiff_t>(index));
+    return result;
+}
+void AnchoredPanel::clear() {
+    Container::clear();
+    anchors_.clear();
+}
+void AnchoredPanel::set_anchor(Node& child, Anchor anchor) { anchors_[child_index(child)] = anchor; }
+Anchor AnchoredPanel::anchor(const Node& child) const { return anchors_[child_index(child)]; }
+void AnchoredPanel::draw() {
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    for (std::size_t index = 0; index < children_.size(); ++index) {
+        Node& child = *children_[index];
+        if (!child.visible()) continue;
+        const Anchor child_anchor = anchors_[index];
+        const Size child_size = child.measure();
+        const ImVec2 target = point_in_rect(child_anchor.target, size_);
+        const ImVec2 self = point_in_rect(child_anchor.self, child_size);
+        ImGui::SetCursorScreenPos({origin.x + target.x + child_anchor.offset_x - self.x,
+                                   origin.y + target.y + child_anchor.offset_y - self.y});
+        draw_child(child);
+    }
+    ImGui::SetCursorScreenPos(origin);
+    ImGui::Dummy({size_.width, size_.height});
+}
+
 Text::Text(std::string value) : value_(std::move(value)) {}
 void Text::set_value(std::string_view value) { value_ = value; }
+Size Text::measure() const {
+    const ImVec2 size = ImGui::CalcTextSize(value_.data(), value_.data() + value_.size());
+    return {size.x, size.y};
+}
 void Text::draw() { ImGui::TextUnformatted(value_.data(), value_.data() + value_.size()); }
 Button::Button(std::string label) : label_(std::move(label)) {}
 void Button::set_label(std::string_view value) { label_ = value; }
 void Button::set_on_click(std::function<void(Button&)> callback) { on_click_ = std::move(callback); }
 void Button::activate() { if (visible() && enabled() && on_click_ && tree_) tree_->enqueue_event(weak_from_this(), attachment_generation_, on_click_); }
+Size Button::measure() const {
+    const ImVec2 text_size = ImGui::CalcTextSize(label_.c_str(), nullptr, true);
+    const ImVec2 padding = ImGui::GetStyle().FramePadding;
+    return {text_size.x + padding.x * 2.0F, ImGui::GetFrameHeight()};
+}
 void Button::draw() {
     if (!enabled()) ImGui::BeginDisabled();
     const bool clicked = ImGui::Button(label_.c_str());

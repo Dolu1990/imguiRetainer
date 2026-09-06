@@ -12,6 +12,17 @@ class CustomNode final : public rgui::Node {
 public:
     void draw() override { ImGui::TextUnformatted("custom node"); }
 };
+
+class RecordingNode final : public rgui::Node {
+public:
+    explicit RecordingNode(rgui::Size size) : size_(size) {}
+    [[nodiscard]] rgui::Size measure() const override { return size_; }
+    void draw() override { position_ = ImGui::GetCursorScreenPos(); }
+    [[nodiscard]] ImVec2 position() const noexcept { return position_; }
+private:
+    rgui::Size size_;
+    ImVec2 position_{};
+};
 } // namespace
 
 int main() {
@@ -78,6 +89,15 @@ int main() {
     try { root->append(first); } catch (const std::logic_error&) { rejected_multiple_parent = true; }
     expect(rejected_multiple_parent);
 
+    auto panel = std::make_shared<rgui::AnchoredPanel>(rgui::Size{100.0F, 50.0F});
+    auto panel_origin = std::make_shared<RecordingNode>(rgui::Size{1.0F, 1.0F});
+    auto centred = std::make_shared<RecordingNode>(rgui::Size{20.0F, 10.0F});
+    panel->append(panel_origin);
+    panel->append(centred, {rgui::AnchorPoint::top, rgui::AnchorPoint::top});
+    root->append(panel);
+    expect(panel->measure().width == 100.0F && panel->measure().height == 50.0F);
+    expect(panel->anchor(*centred).self == rgui::AnchorPoint::top);
+
     ImGui::CreateContext();
     ImGui::GetIO().DisplaySize = {640.0F, 480.0F};
     unsigned char* pixels = nullptr;
@@ -88,6 +108,8 @@ int main() {
     CustomNode custom;
     custom.draw();
     tree.draw();
+    expect(centred->position().x - panel_origin->position().x == 40.0F);
+    expect(centred->position().y == panel_origin->position().y);
     ImGui::EndFrame();
     ImGui::DestroyContext();
     return failures == 0 ? 0 : 1;
