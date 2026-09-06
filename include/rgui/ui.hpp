@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <string>
@@ -32,9 +33,11 @@ struct LayoutParams {
 };
 
 class Container;
+class Button;
 class Node;
 class RenderContext;
 class LayoutContext;
+class UiTree;
 using NodePtr = std::shared_ptr<Node>;
 
 /// Renderer-neutral operations used by retained nodes during a render pass.
@@ -58,7 +61,7 @@ public:
 };
 
 /// A retained UI node. Nodes have one owning parent at most.
-class Node {
+class Node : public std::enable_shared_from_this<Node> {
 public:
     Node();
     virtual ~Node() = default;
@@ -94,8 +97,13 @@ protected:
 
 private:
     friend class Container;
+    friend class Button;
+    friend class UiTree;
+    virtual void set_tree_recursive(UiTree* tree) noexcept;
     NodeId id_;
     Node* parent_ = nullptr;
+    UiTree* tree_ = nullptr;
+    std::uint64_t attachment_generation_ = 0;
     bool visible_ = true;
     bool enabled_ = true;
     LayoutParams layout_{};
@@ -117,6 +125,7 @@ public:
     void render(RenderContext& context) override;
 
 protected:
+    void set_tree_recursive(UiTree* tree) noexcept override;
     std::vector<NodePtr> children_;
 };
 
@@ -191,8 +200,22 @@ public:
     [[nodiscard]] const NodePtr& root() const noexcept { return root_; }
     void apply_default_layout(LayoutContext& context);
     void layout(Size available) noexcept;
+    /// Invokes a FIFO snapshot of pending UI callbacks. Events queued by a
+    /// callback wait for a later flush. Returns the number of callbacks run.
+    [[nodiscard]] std::size_t flush_events();
+    [[nodiscard]] std::size_t pending_event_count() const noexcept { return events_.size(); }
 private:
+    friend class Button;
+    struct Event {
+        std::weak_ptr<Node> target;
+        std::uint64_t attachment_generation = 0;
+        std::function<void(Button&)> callback;
+    };
+
+    void enqueue_event(const std::weak_ptr<Node>& target, std::uint64_t attachment_generation,
+                       std::function<void(Button&)> callback);
     NodePtr root_;
+    std::vector<Event> events_;
 };
 
 } // namespace rgui

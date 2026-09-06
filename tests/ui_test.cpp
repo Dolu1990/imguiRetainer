@@ -71,10 +71,13 @@ int main() {
     bool activated = false;
     first->set_on_click([&activated](rgui::Button&) { activated = true; });
     first->activate();
+    expect(!activated);
+    expect(tree.flush_events() == 1);
     expect(activated);
     activated = false;
     first->set_enabled(false);
     first->activate();
+    expect(tree.flush_events() == 0);
     expect(!activated);
 
     RecordingContext context;
@@ -85,7 +88,47 @@ int main() {
     context.click_next_button = true;
     first->render(context);
     expect(context.rendered_button == "first");
+    expect(!activated);
+    expect(tree.flush_events() == 1);
     expect(activated);
+
+    bool snapshot_callback = false;
+    first->set_on_click([&snapshot_callback](rgui::Button&) { snapshot_callback = true; });
+    first->activate();
+    first->set_on_click([](rgui::Button&) {});
+    first->set_label("changed while queued");
+    expect(tree.flush_events() == 1);
+    expect(snapshot_callback);
+
+    auto self_removing = std::make_shared<rgui::Button>("remove me");
+    root->append(self_removing);
+    self_removing->set_on_click([&root](rgui::Button& button) {
+        const rgui::NodePtr detached_button = root->remove(button);
+    });
+    self_removing->activate();
+    expect(tree.flush_events() == 1);
+    expect(self_removing->parent() == nullptr);
+
+    auto discarded = std::make_shared<rgui::Button>("discarded");
+    bool discarded_called = false;
+    discarded->set_on_click([&discarded_called](rgui::Button&) { discarded_called = true; });
+    root->append(discarded);
+    discarded->activate();
+    const rgui::NodePtr removed_discarded = root->remove(*discarded);
+    expect(tree.flush_events() == 0);
+    expect(!discarded_called);
+
+    int deferred_dispatches = 0;
+    first->set_on_click([&deferred_dispatches](rgui::Button& button) {
+        ++deferred_dispatches;
+        if (deferred_dispatches == 1) button.activate();
+    });
+    first->activate();
+    expect(tree.flush_events() == 1);
+    expect(deferred_dispatches == 1);
+    expect(tree.pending_event_count() == 1);
+    expect(tree.flush_events() == 1);
+    expect(deferred_dispatches == 2);
 
     auto window = std::make_shared<rgui::Window>("test window");
     window->render(context);

@@ -104,7 +104,8 @@ void bind_lua(sol::state_view state) {
         "activate", &Button::activate);
     state.new_usertype<UiTree>("rgui.UiTree", sol::constructors<UiTree()>(),
         "set_root", [](UiTree& tree, const sol::object& root) { tree.set_root(node_from_lua(root)); },
-        "layout", [](UiTree& tree, float width, float height) { tree.layout({width, height}); });
+        "layout", [](UiTree& tree, float width, float height) { tree.layout({width, height}); },
+        "flush_events", &UiTree::flush_events);
 
     api.set_function("stack", [](const std::string& axis) {
         return std::make_shared<Stack>(axis_from_string(axis));

@@ -112,11 +112,13 @@ that later widgets and Lua bindings must follow.
   The initial containers are `Stack` (horizontal or vertical, gap and
   cross-axis alignment) and `Overlay`. Exact text/font measurement is not a
   core concern; the game or rendering adapter may set suitable preferred sizes.
-- `Text` and `Button` are the initial leaves. A button callback receives the
-  button and only runs when the node is visible and enabled. Structural tree
-  mutation (`append`, `remove`, or `clear`) during rendering/event dispatch is
-  unsupported until queued mutations are designed; applications must defer it
-  until after the render pass.
+- `Text` and `Button` are the initial leaves. A button activation checks that
+  the node is visible and enabled, then queues a snapshot of its callback in
+  `UiTree`. Applications call `UiTree::flush_events()` at a safe point; it
+  invokes a FIFO snapshot, so callbacks queued while flushing wait for the
+  next flush. A queued callback is dropped if its target was detached,
+  reattached, moved to a different tree, or destroyed before dispatch.
+  Callbacks may therefore safely mutate the tree once flushing begins.
 - Rendering is virtual through a renderer-neutral `RenderContext`; the backend
   has no closed type switch for built-in widgets. Applications
   can add `Node` subclasses and compose context operations. The ImGui adapter
@@ -163,7 +165,8 @@ public API:
 
 - Styling model, including inheritance and invalidation.
 - State ownership: persistent widget state versus immediate-frame input.
-- Event model, callback lifetime, queued mutation, and safe Lua error handling.
+- Event model beyond button activation, callback lifetime, and safe Lua error
+  handling.
 - Frame lifecycle: who starts/ends an ImGui frame and when rgui renders.
 - Lua ergonomics: userdata shape, property access, callbacks, and GC behavior.
 - Error/diagnostic policy and test strategy for headless core behavior.

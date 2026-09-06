@@ -88,6 +88,12 @@ void Node::invalidate(Dirty flags) noexcept {
     if (parent_ != nullptr) parent_->invalidate(flags);
 }
 
+void Node::set_tree_recursive(UiTree* tree) noexcept {
+    if (tree_ == tree) return;
+    tree_ = tree;
+    ++attachment_generation_;
+}
+
 void Node::clear_dirty_recursive() noexcept { dirty_ = Dirty::none; }
 
 void Node::apply_default_layout(LayoutContext&) {}
@@ -100,6 +106,11 @@ Container::~Container() {
     for (const NodePtr& child : children_) child->parent_ = nullptr;
 }
 
+void Container::set_tree_recursive(UiTree* tree) noexcept {
+    Node::set_tree_recursive(tree);
+    for (const NodePtr& child : children_) child->set_tree_recursive(tree);
+}
+
 void Container::append(NodePtr child) {
     if (!child) throw std::invalid_argument("rgui cannot append a null node");
     if (child->parent_ != nullptr) throw std::logic_error("rgui node already has a parent");
@@ -107,6 +118,7 @@ void Container::append(NodePtr child) {
         if (ancestor == child.get()) throw std::logic_error("rgui cannot introduce a tree cycle");
     }
     child->parent_ = this;
+    child->set_tree_recursive(tree_);
     children_.push_back(std::move(child));
     invalidate(Dirty::structure | Dirty::layout);
 }
@@ -118,12 +130,16 @@ NodePtr Container::remove(Node& child) {
     NodePtr result = std::move(*position);
     children_.erase(position);
     result->parent_ = nullptr;
+    result->set_tree_recursive(nullptr);
     invalidate(Dirty::structure | Dirty::layout);
     return result;
 }
 
 void Container::clear() {
-    for (const NodePtr& child : children_) child->parent_ = nullptr;
+    for (const NodePtr& child : children_) {
+        child->parent_ = nullptr;
+        child->set_tree_recursive(nullptr);
+    }
     children_.clear();
     invalidate(Dirty::structure | Dirty::layout);
 }
@@ -281,7 +297,10 @@ void Text::render(RenderContext& context) { context.text(value_, bounds()); }
 Button::Button(std::string label) : label_(std::move(label)) {}
 void Button::set_label(std::string_view value) { label_ = value; invalidate(Dirty::paint | Dirty::layout); }
 void Button::set_on_click(std::function<void(Button&)> callback) { on_click_ = std::move(callback); }
-void Button::activate() { if (visible() && enabled() && on_click_) on_click_(*this); }
+void Button::activate() {
+    if (!visible() || !enabled() || !on_click_ || tree_ == nullptr) return;
+    tree_->enqueue_event(weak_from_this(), attachment_generation_, on_click_);
+}
 void Button::apply_default_layout(LayoutContext& context) {
     set_automatic_preferred_size(context.measure_button(label_));
 }
@@ -291,7 +310,13 @@ void Button::render(RenderContext& context) {
 
 void UiTree::set_root(NodePtr root) {
     if (root && root->parent() != nullptr) throw std::logic_error("rgui root already has a parent");
+    if (root && root->tree_ != nullptr && root->tree_ != this) {
+        throw std::logic_error("rgui root already belongs to a tree");
+    }
+    if (root_ == root) return;
+    if (root_) root_->set_tree_recursive(nullptr);
     root_ = std::move(root);
+    if (root_) root_->set_tree_recursive(this);
 }
 
 void UiTree::apply_default_layout(LayoutContext& context) {
@@ -302,6 +327,28 @@ void UiTree::layout(Size available) noexcept {
     if (!root_) return;
     root_->arrange({0.0F, 0.0F, std::max(0.0F, available.width), std::max(0.0F, available.height)});
     root_->clear_dirty_recursive();
+}
+
+void UiTree::enqueue_event(const std::weak_ptr<Node>& target, std::uint64_t attachment_generation,
+                           std::function<void(Button&)> callback) {
+    events_.push_back({target, attachment_generation, std::move(callback)});
+}
+
+std::size_t UiTree::flush_events() {
+    std::vector<Event> events = std::move(events_);
+    events_.clear();
+    std::size_t invoked = 0;
+    for (Event& event : events) {
+        const std::shared_ptr<Node> target = event.target.lock();
+        if (!target || target->tree_ != this || target->attachment_generation_ != event.attachment_generation) {
+            continue;
+        }
+        const std::shared_ptr<Button> button = std::dynamic_pointer_cast<Button>(target);
+        if (!button) continue;
+        event.callback(*button);
+        ++invoked;
+    }
+    return invoked;
 }
 
 } // namespace rgui

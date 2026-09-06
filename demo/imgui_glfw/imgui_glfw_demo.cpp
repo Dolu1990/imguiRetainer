@@ -98,8 +98,6 @@ int main() {
         update_status();
     });
 
-    // Render this before the controls: a callback appends here after this
-    // container has been visited, so the new node is laid out next frame.
     ui_window->append(description);
     ui_window->append(status);
     controls->append(add_random_label);
@@ -122,6 +120,10 @@ int main() {
         // straightforward and to exercise the retained layout path.
         rgui::imgui_backend::layout(tree, {420.0F, 120.0F});
         rgui::imgui_backend::render(tree);
+
+        // Dispatch after rendering, when callbacks can safely change the
+        // retained tree. Layout and rendering observe those changes next frame.
+        static_cast<void>(tree.flush_events());
 
         ImGui::Render();
         int framebuffer_width = 0;

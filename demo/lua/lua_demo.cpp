@@ -90,6 +90,7 @@ int main() {
 
         rgui::imgui_backend::layout(tree, {480.0F, 140.0F});
         rgui::imgui_backend::render(tree);
+        static_cast<void>(tree.flush_events());
 
         ImGui::Render();
         int framebuffer_width = 0;
