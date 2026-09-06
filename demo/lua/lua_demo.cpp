@@ -52,8 +52,6 @@ int main() {
 
     const sol::protected_function_result result = lua.safe_script(R"(
         local root = rgui.window("Lua-built retained rgui")
-        root.axis = "vertical"
-
         local description = rgui.text("This retained UI was constructed and is updated by Lua.")
         local status = rgui.text("Button clicks: 0")
         local action = rgui.button("Increment")

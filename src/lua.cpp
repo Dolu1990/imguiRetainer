@@ -24,7 +24,6 @@ const char* axis_to_string(Axis value) noexcept {
 NodePtr node_from_lua(const sol::object& value) {
     if (value.is<std::shared_ptr<Window>>()) return value.as<std::shared_ptr<Window>>();
     if (value.is<std::shared_ptr<Stack>>()) return value.as<std::shared_ptr<Stack>>();
-    if (value.is<std::shared_ptr<Overlay>>()) return value.as<std::shared_ptr<Overlay>>();
     if (value.is<std::shared_ptr<Text>>()) return value.as<std::shared_ptr<Text>>();
     if (value.is<std::shared_ptr<Button>>()) return value.as<std::shared_ptr<Button>>();
     throw std::invalid_argument("expected an rgui node");
@@ -48,10 +47,8 @@ void bind_lua(sol::state_view state) {
         "axis", sol::property(
             [](const Stack& stack) { return axis_to_string(stack.axis()); },
             [](Stack& stack, const std::string& value) { stack.set_axis(axis_from_string(value)); }));
-    state.new_usertype<Overlay>("rgui.Overlay", sol::no_constructor,
-        sol::base_classes, sol::bases<Container, Node>());
     state.new_usertype<Window>("rgui.Window", sol::no_constructor,
-        sol::base_classes, sol::bases<Stack, Container, Node>(),
+        sol::base_classes, sol::bases<Container, Node>(),
         "title", sol::property(
             [](const Window& window) { return std::string(window.title()); },
             [](Window& window, const std::string& value) { window.set_title(value); }));
@@ -84,7 +81,6 @@ void bind_lua(sol::state_view state) {
         return std::make_shared<Stack>(axis_from_string(axis));
     });
     api.set_function("window", [](const std::string& title) { return std::make_shared<Window>(title); });
-    api.set_function("overlay", [] { return std::make_shared<Overlay>(); });
     api.set_function("text", [](const std::string& value) { return std::make_shared<Text>(value); });
     api.set_function("button", [](const std::string& label) { return std::make_shared<Button>(label); });
     api.set_function("tree", [] { return UiTree{}; });

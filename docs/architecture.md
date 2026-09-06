@@ -11,8 +11,8 @@ state.
 
 - Public target: `rgui::rgui`
 - Public headers: `<rgui/rgui.hpp>` and `<rgui/ui.hpp>`
-- Retained nodes: `Window`, `Stack`, `Overlay`, `Text`, and `Button`
-- Each node implements `draw(ImGuiContext&)`; custom nodes may include
+- Retained nodes: `Window`, `Stack`, `Text`, and `Button`
+- Each node implements `draw()`; custom nodes may include
   `imgui.h` and use the Dear ImGui API directly.
 - `UiTree::draw()` validates that a current ImGui context exists, establishes
   stable root identity, and draws the tree into the caller's current frame.
@@ -26,10 +26,12 @@ needlessly difficult.
 
 ## Dependencies
 
-Dear ImGui is pinned under `ext/imgui` and compiled into the installed package
-as `rgui::imgui`; `rgui::rgui` links it transitively. GLFW is a pinned
-submodule used only by the opt-in graphical demo. sol2 is a pinned submodule;
-Lua remains supplied by the embedding game through `RGUI_LUA_TARGET`.
+Dear ImGui is pinned under `ext/imgui` and used automatically when
+`RGUI_IMGUI_TARGET` is empty, so the repository builds by itself. An embedding
+game can instead provide its own ImGui target through `RGUI_IMGUI_TARGET`,
+avoiding a second ImGui implementation. GLFW is a pinned submodule used only
+by the opt-in graphical demo. sol2 is a pinned submodule; Lua remains supplied
+by the embedding game through `RGUI_LUA_TARGET`.
 
 Initialize submodules after cloning:
 
@@ -45,10 +47,9 @@ git submodule update --init --recursive
 IDs—not labels or child positions—provide stable ImGui identity.
 
 Containers own their children. A vertical `Stack` uses ImGui's normal flow; a
-horizontal `Stack` uses `SameLine()` between visible children. `Overlay` is a
-plain grouping container; a real overlay, table, popup, or other composite
-should be a specialized node that expresses ImGui's own begin/end protocol
-directly.
+horizontal `Stack` uses `SameLine()` between visible children. A real overlay,
+table, popup, or other composite should be a specialized node that expresses
+ImGui's own begin/end protocol directly.
 
 Button callbacks are queued and must be delivered by `UiTree::flush_events()`
 at an application-selected safe point. A queued callback is discarded when its

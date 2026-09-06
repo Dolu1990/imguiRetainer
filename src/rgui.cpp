@@ -14,11 +14,9 @@ std::string_view version() noexcept { return "0.1.0"; }
 namespace { std::atomic<NodeId> next_node_id{1}; }
 
 Node::Node() : id_(next_node_id.fetch_add(1, std::memory_order_relaxed)) {}
-void Node::set_visible(bool value) noexcept { if (visible_ != value) { visible_ = value; invalidate(); } }
-void Node::set_enabled(bool value) noexcept { if (enabled_ != value) { enabled_ = value; invalidate(); } }
-void Node::invalidate(Dirty flags) noexcept { dirty_ = dirty_ | flags; if (parent_) parent_->invalidate(flags); }
+void Node::set_visible(bool value) noexcept { visible_ = value; }
+void Node::set_enabled(bool value) noexcept { enabled_ = value; }
 void Node::set_tree_recursive(UiTree* tree) noexcept { if (tree_ != tree) { tree_ = tree; ++attachment_generation_; } }
-void Node::clear_dirty_recursive() noexcept { dirty_ = Dirty::none; }
 
 Container::~Container() { for (const NodePtr& child : children_) child->parent_ = nullptr; }
 void Container::set_tree_recursive(UiTree* tree) noexcept {
@@ -34,7 +32,6 @@ void Container::append(NodePtr child) {
     child->parent_ = this;
     child->set_tree_recursive(tree_);
     children_.push_back(std::move(child));
-    invalidate(Dirty::structure);
 }
 NodePtr Container::remove(Node& child) {
     const auto position = std::find_if(children_.begin(), children_.end(), [&child](const NodePtr& candidate) { return candidate.get() == &child; });
@@ -43,52 +40,51 @@ NodePtr Container::remove(Node& child) {
     children_.erase(position);
     result->parent_ = nullptr;
     result->set_tree_recursive(nullptr);
-    invalidate(Dirty::structure);
     return result;
 }
 void Container::clear() {
     for (const NodePtr& child : children_) { child->parent_ = nullptr; child->set_tree_recursive(nullptr); }
     children_.clear();
-    invalidate(Dirty::structure);
 }
-void Container::clear_dirty_recursive() noexcept { Node::clear_dirty_recursive(); for (const NodePtr& child : children_) child->clear_dirty_recursive(); }
-void Container::draw_children(ImGuiContext& context) {
+void Container::draw_child(Node& child) {
+    if (!child.visible()) return;
+    const std::string id = std::to_string(child.id());
+    ImGui::PushID(id.c_str()); child.draw(); ImGui::PopID();
+}
+void Container::draw_children() {
     for (const NodePtr& child : children_) {
-        if (!child->visible()) continue;
-        const std::string id = std::to_string(child->id());
-        ImGui::PushID(id.c_str()); child->draw(context); ImGui::PopID();
+        draw_child(*child);
     }
 }
-void Container::draw(ImGuiContext& context) { draw_children(context); }
+void Container::draw() { draw_children(); }
 
-void Stack::set_axis(Axis value) noexcept { if (axis_ != value) { axis_ = value; invalidate(Dirty::structure); } }
-void Stack::draw(ImGuiContext& context) {
+void Stack::set_axis(Axis value) noexcept { axis_ = value; }
+void Stack::draw() {
     bool first = true;
     for (const NodePtr& child : children_) {
         if (!child->visible()) continue;
         if (axis_ == Axis::horizontal && !first) ImGui::SameLine();
-        const std::string id = std::to_string(child->id());
-        ImGui::PushID(id.c_str()); child->draw(context); ImGui::PopID();
+        draw_child(*child);
         first = false;
     }
 }
 
 Window::Window(std::string title) : title_(std::move(title)) {}
-void Window::set_title(std::string_view value) { title_ = value; invalidate(); }
-void Window::draw(ImGuiContext& context) {
+void Window::set_title(std::string_view value) { title_ = value; }
+void Window::draw() {
     const std::string title = title_ + "###rgui-" + std::to_string(id());
     const bool draw_contents = ImGui::Begin(title.c_str());
-    if (draw_contents) Stack::draw(context);
+    if (draw_contents) draw_children();
     ImGui::End();
 }
 Text::Text(std::string value) : value_(std::move(value)) {}
-void Text::set_value(std::string_view value) { value_ = value; invalidate(); }
-void Text::draw(ImGuiContext&) { ImGui::TextUnformatted(value_.data(), value_.data() + value_.size()); }
+void Text::set_value(std::string_view value) { value_ = value; }
+void Text::draw() { ImGui::TextUnformatted(value_.data(), value_.data() + value_.size()); }
 Button::Button(std::string label) : label_(std::move(label)) {}
-void Button::set_label(std::string_view value) { label_ = value; invalidate(); }
+void Button::set_label(std::string_view value) { label_ = value; }
 void Button::set_on_click(std::function<void(Button&)> callback) { on_click_ = std::move(callback); }
 void Button::activate() { if (visible() && enabled() && on_click_ && tree_) tree_->enqueue_event(weak_from_this(), attachment_generation_, on_click_); }
-void Button::draw(ImGuiContext&) {
+void Button::draw() {
     if (!enabled()) ImGui::BeginDisabled();
     const bool clicked = ImGui::Button(label_.c_str());
     if (!enabled()) ImGui::EndDisabled();
@@ -108,8 +104,7 @@ void UiTree::draw() {
     ImGuiContext* const context = ImGui::GetCurrentContext();
     if (!context) throw std::logic_error("rgui drawing requires a current Dear ImGui context");
     const std::string id = std::to_string(root_->id());
-    ImGui::PushID(id.c_str()); root_->draw(*context); ImGui::PopID();
-    root_->clear_dirty_recursive();
+    ImGui::PushID(id.c_str()); root_->draw(); ImGui::PopID();
 }
 void UiTree::enqueue_event(const std::weak_ptr<Node>& target, std::uint64_t attachment_generation, std::function<void(Button&)> callback) { events_.push_back({target, attachment_generation, std::move(callback)}); }
 std::size_t UiTree::flush_events() {

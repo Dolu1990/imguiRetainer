@@ -10,7 +10,7 @@ int failures = 0;
 void expect(bool condition) { if (!condition) ++failures; }
 class CustomNode final : public rgui::Node {
 public:
-    void draw(ImGuiContext&) override { ImGui::TextUnformatted("custom node"); }
+    void draw() override { ImGui::TextUnformatted("custom node"); }
 };
 } // namespace
 
@@ -86,9 +86,8 @@ int main() {
     ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
     ImGui::NewFrame();
     CustomNode custom;
-    custom.draw(*ImGui::GetCurrentContext());
+    custom.draw();
     tree.draw();
-    expect(root->dirty() == rgui::Dirty::none);
     ImGui::EndFrame();
     ImGui::DestroyContext();
     return failures == 0 ? 0 : 1;
