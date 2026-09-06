@@ -80,6 +80,38 @@ void Window::draw() {
     ImGui::End();
 }
 
+Table::Table(std::size_t columns) : headers_(columns) {
+    if (columns == 0) throw std::invalid_argument("rgui table requires at least one column");
+}
+void Table::set_header(std::size_t column, std::string_view value) {
+    if (column >= columns()) throw std::out_of_range("rgui table column is out of range");
+    headers_[column] = value;
+}
+std::string_view Table::header(std::size_t column) const {
+    if (column >= columns()) throw std::out_of_range("rgui table column is out of range");
+    return headers_[column];
+}
+void Table::draw() {
+    const std::string table_id = "##rgui-table-" + std::to_string(id());
+    if (!ImGui::BeginTable(table_id.c_str(), static_cast<int>(columns()),
+                           ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                               ImGuiTableFlags_SizingStretchSame)) {
+        return;
+    }
+    bool has_headers = false;
+    for (const std::string& value : headers_) {
+        ImGui::TableSetupColumn(value.empty() ? nullptr : value.c_str());
+        has_headers = has_headers || !value.empty();
+    }
+    if (has_headers) ImGui::TableHeadersRow();
+    for (const NodePtr& child : children_) {
+        if (!child->visible()) continue;
+        ImGui::TableNextColumn();
+        draw_child(*child);
+    }
+    ImGui::EndTable();
+}
+
 namespace {
 ImVec2 point_in_rect(AnchorPoint point, Size size) {
     const float center_x = size.width * 0.5F;

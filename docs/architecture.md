@@ -11,7 +11,7 @@ state.
 
 - Public target: `rgui::rgui`
 - Public headers: `<rgui/rgui.hpp>` and `<rgui/ui.hpp>`
-- Retained nodes: `Window`, `Stack`, `AnchoredPanel`, `Text`, and `Button`
+- Retained nodes: `Window`, `Stack`, `Table`, `AnchoredPanel`, `Text`, and `Button`
 - Each node implements `draw()`; custom nodes may include
   `imgui.h` and use the Dear ImGui API directly.
 - `UiTree::draw()` validates that a current ImGui context exists, establishes
@@ -51,9 +51,10 @@ horizontal `Stack` uses `SameLine()` between visible children. `AnchoredPanel`
 owns each child's anchor metadata, uses the child's `measure()` result to
 resolve its position, and then draws the child at that cursor position. Its
 dimensions can be fixed or fill either available ImGui content axis. A real
-overlay, table, popup, or other composite
-should be a specialized node that expresses ImGui's own begin/end protocol
-directly.
+overlay, table, popup, or other composite should be a specialized node that
+expresses ImGui's own begin/end protocol directly. `Table` is the first such
+composite: it owns a fixed positive number of columns, optional headers, and
+draws visible children as row-major cells.
 
 Button callbacks are queued and must be delivered by `UiTree::flush_events()`
 at an application-selected safe point. A queued callback is discarded when its

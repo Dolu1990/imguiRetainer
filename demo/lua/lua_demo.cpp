@@ -58,10 +58,19 @@ int main() {
         local panel = rgui.anchored_panel("fill", 90)
         local panel_text = rgui.text("This text is anchored to the panel's top-left.")
         local panel_action = rgui.button("Centred increment")
+        local stats = rgui.table(2)
+        local stat_value = rgui.text("0")
+        stats:set_header(1, "Item")
+        stats:set_header(2, "Value")
+        stats:append(rgui.text("Retained nodes"))
+        stats:append(rgui.text("Table cells are Lua-built"))
+        stats:append(rgui.text("Click count"))
+        stats:append(stat_value)
         local clicks = 0
         local function increment(button)
             clicks = clicks + 1
             status.value = "Button clicks: " .. clicks
+            stat_value.value = tostring(clicks)
         end
         action:on_click(increment)
         panel_action:on_click(increment)
@@ -69,6 +78,7 @@ int main() {
         root:append(description)
         root:append(status)
         root:append(action)
+        root:append(stats)
         panel:append(panel_text, "top_left", "top_left", 0, 0)
         panel:append(panel_action, "top", "top", 0, 46)
         --panel:append(panel_action, "top_left", "top_left", 0, 0)

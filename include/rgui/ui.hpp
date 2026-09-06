@@ -99,6 +99,21 @@ private:
     std::string title_;
 };
 
+/// Draws children as cells in a Dear ImGui table, in row-major order. A new
+/// row is started automatically after every `columns()` visible children.
+/// Headers are optional and use zero-based column indices in C++.
+class Table final : public Container {
+public:
+    explicit Table(std::size_t columns);
+    [[nodiscard]] std::size_t columns() const noexcept { return headers_.size(); }
+    void set_header(std::size_t column, std::string_view value);
+    [[nodiscard]] std::string_view header(std::size_t column) const;
+    void draw() override;
+
+private:
+    std::vector<std::string> headers_;
+};
+
 enum class AnchorPoint {
     top_left, top, top_right,
     left, center, right,

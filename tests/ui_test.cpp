@@ -122,6 +122,17 @@ int main() {
     expect(panel->measure().width == 100.0F && panel->measure().height == 50.0F);
     expect(panel->anchor(*centred).self == rgui::AnchorPoint::top);
 
+    auto table = std::make_shared<rgui::Table>(2);
+    table->set_header(0, "Name");
+    table->set_header(1, "Value");
+    table->append(std::make_shared<rgui::Text>("Health"));
+    table->append(std::make_shared<rgui::Text>("100"));
+    root->append(table);
+    expect(table->columns() == 2 && table->header(0) == "Name" && table->children().size() == 2);
+    bool rejected_empty_table = false;
+    try { static_cast<void>(rgui::Table(0)); } catch (const std::invalid_argument&) { rejected_empty_table = true; }
+    expect(rejected_empty_table);
+
     ImGui::CreateContext();
     ImGui::GetIO().DisplaySize = {640.0F, 480.0F};
     unsigned char* pixels = nullptr;
