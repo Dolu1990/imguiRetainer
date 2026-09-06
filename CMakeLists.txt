@@ -13,23 +13,35 @@ option(RGUI_BUILD_LUA_BINDINGS
     "Build the optional sol2 Lua binding adapter" OFF)
 option(RGUI_BUILD_LUA_DEMO
     "Build the sol2 Lua API demo application" OFF)
+set(RGUI_IMGUI_TARGET "" CACHE STRING
+    "Existing Dear ImGui CMake target; empty uses the bundled pinned source")
 set(RGUI_LUA_TARGET "" CACHE STRING
     "Imported/normal CMake target that provides Lua (for example Lua::Lua)")
 set(RGUI_SOL2_TARGET "" CACHE STRING
     "Optional imported/normal CMake target that provides sol2 (defaults to bundled ext/sol2)")
 
-add_library(rgui_imgui STATIC
-    ext/imgui/imgui.cpp
-    ext/imgui/imgui_draw.cpp
-    ext/imgui/imgui_tables.cpp
-    ext/imgui/imgui_widgets.cpp
-)
-add_library(rgui::imgui ALIAS rgui_imgui)
-target_compile_features(rgui_imgui PUBLIC cxx_std_23)
-target_include_directories(rgui_imgui PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ext/imgui>
-    $<INSTALL_INTERFACE:include/rgui/third_party/imgui>
-)
+if(RGUI_IMGUI_TARGET)
+    if(NOT TARGET ${RGUI_IMGUI_TARGET})
+        message(FATAL_ERROR "RGUI_IMGUI_TARGET '${RGUI_IMGUI_TARGET}' is not a CMake target.")
+    endif()
+    set(rgui_imgui_link_target ${RGUI_IMGUI_TARGET})
+    set(rgui_uses_bundled_imgui OFF)
+else()
+    add_library(rgui_imgui STATIC
+        ext/imgui/imgui.cpp
+        ext/imgui/imgui_draw.cpp
+        ext/imgui/imgui_tables.cpp
+        ext/imgui/imgui_widgets.cpp
+    )
+    add_library(rgui::imgui ALIAS rgui_imgui)
+    target_compile_features(rgui_imgui PUBLIC cxx_std_23)
+    target_include_directories(rgui_imgui PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ext/imgui>
+        $<INSTALL_INTERFACE:include/rgui/third_party/imgui>
+    )
+    set(rgui_imgui_link_target rgui::imgui)
+    set(rgui_uses_bundled_imgui ON)
+endif()
 
 add_library(rgui src/rgui.cpp)
 add_library(rgui::rgui ALIAS rgui)
@@ -40,7 +52,14 @@ target_include_directories(rgui
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(rgui PUBLIC rgui::imgui)
+if(rgui_uses_bundled_imgui)
+    target_link_libraries(rgui PUBLIC rgui::imgui)
+else()
+    # The embedding build owns this target and must link it when consuming an
+    # installed rgui package too; arbitrary external target names cannot be
+    # reconstructed in an exported package.
+    target_link_libraries(rgui PUBLIC $<BUILD_INTERFACE:${rgui_imgui_link_target}>)
+endif()
 
 if(RGUI_BUILD_LUA_DEMO)
     set(RGUI_BUILD_LUA_BINDINGS ON)
@@ -105,20 +124,26 @@ endif()
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-install(TARGETS rgui rgui_imgui
+install(TARGETS rgui
     EXPORT rguiTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(FILES
-    ext/imgui/imgui.h
-    ext/imgui/imconfig.h
-    ext/imgui/imstb_rectpack.h
-    ext/imgui/imstb_textedit.h
-    ext/imgui/imstb_truetype.h
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rgui/third_party/imgui)
+if(rgui_uses_bundled_imgui)
+    install(TARGETS rgui_imgui EXPORT rguiTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(FILES
+        ext/imgui/imgui.h
+        ext/imgui/imconfig.h
+        ext/imgui/imstb_rectpack.h
+        ext/imgui/imstb_textedit.h
+        ext/imgui/imstb_truetype.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rgui/third_party/imgui)
+endif()
 install(EXPORT rguiTargets
     FILE rguiTargets.cmake
     NAMESPACE rgui::
