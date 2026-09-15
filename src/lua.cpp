@@ -46,7 +46,17 @@ NodePtr node_from_lua(const sol::object& value) {
 
 } // namespace
 
-void bindLua(sol::state_view state) {
+
+
+void callbackExecuteDefault(sol::function& callback, std::vector<sol::object>& args){
+    sol::protected_function_result result = callback(sol::as_args(args));
+    if (!result.valid()) {
+        sol::error error = result;
+        throw std::runtime_error(error.what());
+    }
+}
+
+void bindLua(sol::state_view state, std::function<void(sol::function&, std::vector<sol::object>&)> callbackExecute) {
     sol::table api = state["rgui"].get_or_create<sol::table>();
 
     state.new_usertype<Node>("rgui.Node", sol::no_constructor,
@@ -125,13 +135,10 @@ void bindLua(sol::state_view state) {
         "label", sol::property(
             [](const Button& button) { return std::string(button.label()); },
             [](Button& button, const std::string& value) { button.setLabel(value); }),
-        "onClick", [](Button& button, sol::protected_function callback) {
-            button.setOnClick([callback = std::move(callback)](Button& clicked) mutable {
-                sol::protected_function_result result = callback(clicked);
-                if (!result.valid()) {
-                    sol::error error = result;
-                    throw std::runtime_error(error.what());
-                }
+        "onClick", [callbackExecute](Button& button, sol::function callback) {
+            button.setOnClick([callback = std::move(callback), callbackExecute](Button& clicked) mutable {
+                std::vector<sol::object> args;
+                callbackExecute(callback, args);
             });
         },
         "activate", &Button::activate);
