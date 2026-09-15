@@ -22,21 +22,9 @@ const char* axis_to_string(Axis value) noexcept {
     return value == Axis::horizontal ? "horizontal" : "vertical";
 }
 
-AnchorPoint anchor_point_from_string(const std::string& value) {
-    if (value == "topLeft") return AnchorPoint::topLeft;
-    if (value == "top") return AnchorPoint::top;
-    if (value == "topRight") return AnchorPoint::topRight;
-    if (value == "left") return AnchorPoint::left;
-    if (value == "center") return AnchorPoint::center;
-    if (value == "right") return AnchorPoint::right;
-    if (value == "bottomLeft") return AnchorPoint::bottomLeft;
-    if (value == "bottom") return AnchorPoint::bottom;
-    if (value == "bottomRight") return AnchorPoint::bottomRight;
-    throw std::invalid_argument("anchor point must be topLeft, top, topRight, left, center, right, bottomLeft, bottom, or bottomRight");
-}
-
-Anchor anchor_from_lua(const std::string& self, const std::string& target, float offsetX, float offsetY) {
-    return {anchor_point_from_string(self), anchor_point_from_string(target), offsetX, offsetY};
+Anchor anchor_from_lua(float selfX, float selfY, float targetX, float targetY,
+                       float offsetX, float offsetY) {
+    return {{selfX, selfY}, {targetX, targetY}, offsetX, offsetY};
 }
 
 std::pair<float, PanelExtent> panel_extent_from_lua(const sol::object& value) {
@@ -99,25 +87,30 @@ void bindLua(sol::state_view state) {
         sol::base_classes, sol::bases<Container, Node>(),
         "append", sol::overload(
             [](AnchoredPanel& panel, const sol::object& child) { panel.append(node_from_lua(child)); },
-            [](AnchoredPanel& panel, const sol::object& child, const std::string& self,
-               const std::string& target, float offsetX, float offsetY) {
-                panel.append(node_from_lua(child), anchor_from_lua(self, target, offsetX, offsetY));
+            [](AnchoredPanel& panel, const sol::object& child, float selfX, float selfY,
+               float targetX, float targetY, float offsetX, float offsetY) {
+                panel.append(node_from_lua(child),
+                             anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY));
             },
-            [](AnchoredPanel& panel, const sol::object& child, const std::string& primarySelf,
-               const std::string& primaryTarget, float primaryOffsetX, float primaryOffsetY,
-               const std::string& secondarySelf, const std::string& secondaryTarget,
+            [](AnchoredPanel& panel, const sol::object& child, float primarySelfX, float primarySelfY,
+               float primaryTargetX, float primaryTargetY, float primaryOffsetX, float primaryOffsetY,
+               float secondarySelfX, float secondarySelfY, float secondaryTargetX, float secondaryTargetY,
                float secondaryOffsetX, float secondaryOffsetY) {
                 panel.append(node_from_lua(child),
-                             anchor_from_lua(primarySelf, primaryTarget, primaryOffsetX, primaryOffsetY),
-                             anchor_from_lua(secondarySelf, secondaryTarget, secondaryOffsetX, secondaryOffsetY));
+                             anchor_from_lua(primarySelfX, primarySelfY, primaryTargetX, primaryTargetY,
+                                             primaryOffsetX, primaryOffsetY),
+                             anchor_from_lua(secondarySelfX, secondarySelfY, secondaryTargetX, secondaryTargetY,
+                                             secondaryOffsetX, secondaryOffsetY));
             }),
-        "setAnchor", [](AnchoredPanel& panel, const sol::object& child, const std::string& self,
-                           const std::string& target, float offsetX, float offsetY) {
-            panel.setAnchor(*node_from_lua(child), anchor_from_lua(self, target, offsetX, offsetY));
+        "setAnchor", [](AnchoredPanel& panel, const sol::object& child, float selfX, float selfY,
+                           float targetX, float targetY, float offsetX, float offsetY) {
+            panel.setAnchor(*node_from_lua(child),
+                            anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY));
         },
-        "setSecondAnchor", [](AnchoredPanel& panel, const sol::object& child, const std::string& self,
-                                  const std::string& target, float offsetX, float offsetY) {
-            panel.setSecondAnchor(*node_from_lua(child), anchor_from_lua(self, target, offsetX, offsetY));
+        "setSecondAnchor", [](AnchoredPanel& panel, const sol::object& child, float selfX, float selfY,
+                                  float targetX, float targetY, float offsetX, float offsetY) {
+            panel.setSecondAnchor(*node_from_lua(child),
+                                  anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY));
         },
         "clearSecondAnchor", [](AnchoredPanel& panel, const sol::object& child) {
             panel.setSecondAnchor(*node_from_lua(child), std::nullopt);

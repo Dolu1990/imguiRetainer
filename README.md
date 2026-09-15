@@ -17,7 +17,7 @@ not need position or alignment state. Its dimensions are fixed by default:
 auto panel = std::make_shared<rgui::AnchoredPanel>(rgui::Size{320.0F, 100.0F});
 panel->append(std::make_shared<rgui::Text>("Status"));
 panel->append(std::make_shared<rgui::Button>("Continue"), {
-    rgui::AnchorPoint::top, rgui::AnchorPoint::top, 0.0F, 32.0F,
+    {0.5F, 0.0F}, {0.5F, 0.0F}, 0.0F, 32.0F,
 });
 ```
 
@@ -31,16 +31,17 @@ keeping its intrinsic height:
 
 ```cpp
 panel->append(std::make_shared<rgui::Button>("Continue"),
-    {rgui::AnchorPoint::topLeft, rgui::AnchorPoint::topLeft, 12.0F, 32.0F},
-    {rgui::AnchorPoint::topRight, rgui::AnchorPoint::topRight, -12.0F, 32.0F});
+    {{0.0F, 0.0F}, {0.0F, 0.0F}, 12.0F, 32.0F},
+    {{1.0F, 0.0F}, {1.0F, 0.0F}, -12.0F, 32.0F});
 ```
 
-The optional Lua binding exposes the same layout through anchor-point strings:
+The optional Lua binding takes self x/y then target x/y fractions (followed by
+pixel offsets):
 
 ```lua
 local panel = rgui.anchoredPanel(320, 100)
-panel:append(rgui.text("Status"), "topLeft", "topLeft", 12, 12)
-panel:append(rgui.button("Continue"), "top", "top", 0, 32)
+panel:append(rgui.text("Status"), 0, 0, 0, 0, 12, 12)
+panel:append(rgui.button("Continue"), 0.5, 0, 0.5, 0, 0, 32)
 ```
 
 Lua accepts the same two-anchor form, or `setSecondAnchor`, using another

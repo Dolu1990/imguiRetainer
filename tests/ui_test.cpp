@@ -148,13 +148,20 @@ int main() {
     auto centred = std::make_shared<RecordingNode>(rgui::Size{20.0F, 10.0F});
     auto stretched = std::make_shared<ProposalRecordingNode>();
     panel->append(panel_origin);
-    panel->append(centred, {rgui::AnchorPoint::top, rgui::AnchorPoint::top});
+    panel->append(centred, {{0.5F, 0.0F}, {0.5F, 0.0F}});
     panel->append(stretched,
-                  {rgui::AnchorPoint::topLeft, rgui::AnchorPoint::topLeft, 10.0F, 15.0F},
-                  {rgui::AnchorPoint::topRight, rgui::AnchorPoint::topRight, -10.0F, 15.0F});
+                  {{0.0F, 0.0F}, {0.0F, 0.0F}, 10.0F, 15.0F},
+                  {{1.0F, 0.0F}, {1.0F, 0.0F}, -10.0F, 15.0F});
     root->append(panel);
     expect(panel->measure().width == 100.0F && panel->measure().height == 50.0F);
-    expect(panel->anchor(*centred).self == rgui::AnchorPoint::top);
+    expect(panel->anchor(*centred).self == rgui::AnchorPoint{0.5F, 0.0F});
+    bool rejected_invalid_anchor = false;
+    try {
+        panel->setAnchor(*centred, {{-0.1F, 0.0F}, {0.0F, 0.0F}});
+    } catch (const std::invalid_argument&) {
+        rejected_invalid_anchor = true;
+    }
+    expect(rejected_invalid_anchor);
 
     auto table = std::make_shared<rgui::Table>(2);
     table->setHeader(0, "Name");

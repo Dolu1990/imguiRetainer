@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -140,28 +141,19 @@ void ScrollArea::draw() {
 
 namespace {
 ImVec2 point_in_rect(AnchorPoint point, Size size) {
-    const float center_x = size.width * 0.5F;
-    const float center_y = size.height * 0.5F;
-    switch (point) {
-    case AnchorPoint::topLeft: return {0.0F, 0.0F};
-    case AnchorPoint::top: return {center_x, 0.0F};
-    case AnchorPoint::topRight: return {size.width, 0.0F};
-    case AnchorPoint::left: return {0.0F, center_y};
-    case AnchorPoint::center: return {center_x, center_y};
-    case AnchorPoint::right: return {size.width, center_y};
-    case AnchorPoint::bottomLeft: return {0.0F, size.height};
-    case AnchorPoint::bottom: return {center_x, size.height};
-    case AnchorPoint::bottomRight: return {size.width, size.height};
+    return {point.x * size.width, point.y * size.height};
+}
+
+void validate_anchor_point(AnchorPoint point) {
+    if (!std::isfinite(point.x) || !std::isfinite(point.y) || point.x < 0.0F || point.x > 1.0F ||
+        point.y < 0.0F || point.y > 1.0F) {
+        throw std::invalid_argument("rgui anchor fractions must be finite values from 0 to 1");
     }
-    return {};
 }
 
-float horizontal_fraction(AnchorPoint point) {
-    return point_in_rect(point, {1.0F, 1.0F}).x;
-}
-
-float vertical_fraction(AnchorPoint point) {
-    return point_in_rect(point, {1.0F, 1.0F}).y;
+void validate_anchor(Anchor anchor) {
+    validate_anchor_point(anchor.self);
+    validate_anchor_point(anchor.target);
 }
 
 std::optional<float> proposed_axis(float primary_target, float secondary_target,
@@ -196,10 +188,13 @@ Size AnchoredPanel::measure() const {
 }
 void AnchoredPanel::append(NodePtr child) { append(std::move(child), {}); }
 void AnchoredPanel::append(NodePtr child, Anchor anchor) {
+    validate_anchor(anchor);
     Container::append(std::move(child));
     anchors_.push_back({anchor, std::nullopt});
 }
 void AnchoredPanel::append(NodePtr child, Anchor primary_anchor, Anchor secondary_anchor) {
+    validate_anchor(primary_anchor);
+    validate_anchor(secondary_anchor);
     Container::append(std::move(child));
     anchors_.push_back({primary_anchor, secondary_anchor});
 }
@@ -220,9 +215,13 @@ void AnchoredPanel::clear() {
     Container::clear();
     anchors_.clear();
 }
-void AnchoredPanel::setAnchor(Node& child, Anchor anchor) { anchors_[child_index(child)].primary = anchor; }
+void AnchoredPanel::setAnchor(Node& child, Anchor anchor) {
+    validate_anchor(anchor);
+    anchors_[child_index(child)].primary = anchor;
+}
 Anchor AnchoredPanel::anchor(const Node& child) const { return anchors_[child_index(child)].primary; }
 void AnchoredPanel::setSecondAnchor(Node& child, std::optional<Anchor> anchor) {
+    if (anchor) validate_anchor(*anchor);
     anchors_[child_index(child)].secondary = anchor;
 }
 const std::optional<Anchor>& AnchoredPanel::secondAnchor(const Node& child) const {
@@ -243,12 +242,10 @@ void AnchoredPanel::draw() {
             const ImVec2 secondary_target = point_in_rect(secondary.target, resolved_size);
             proposal.width = proposed_axis(primary_target.x + child_anchor.offsetX,
                                            secondary_target.x + secondary.offsetX,
-                                           horizontal_fraction(child_anchor.self),
-                                           horizontal_fraction(secondary.self));
+                                           child_anchor.self.x, secondary.self.x);
             proposal.height = proposed_axis(primary_target.y + child_anchor.offsetY,
                                             secondary_target.y + secondary.offsetY,
-                                            vertical_fraction(child_anchor.self),
-                                            vertical_fraction(secondary.self));
+                                            child_anchor.self.y, secondary.self.y);
         }
         const Size child_size = child.measure(proposal);
         const ImVec2 target = point_in_rect(child_anchor.target, resolved_size);

@@ -23,9 +23,9 @@ int main() {
         stats:append(rgui.text("Health"))
         stats:append(rgui.text("100"))
         log:append(rgui.text("First log entry"))
-        panel:append(label, "topLeft", "topLeft", 12, 12)
-        panel:append(action, "top", "top", 0, 32)
-        panel:setSecondAnchor(action, "topRight", "topRight", -12, 32)
+        panel:append(label, 0, 0, 0, 0, 12, 12)
+        panel:append(action, 0.5, 0, 0.5, 0, 0, 32)
+        panel:setSecondAnchor(action, 1, 0, 1, 0, -12, 32)
     )", sol::script_pass_on_error);
     if (!result.valid()) return 1;
 
@@ -55,10 +55,11 @@ int main() {
     return panel->size().width == 320.0F && panel->size().height == 100.0F &&
                    full_panel->widthExtent() == rgui::PanelExtent::fill &&
                    full_panel->heightExtent() == rgui::PanelExtent::fill &&
-                   anchor.self == rgui::AnchorPoint::top && anchor.target == rgui::AnchorPoint::top &&
+                   anchor.self == rgui::AnchorPoint{0.5F, 0.0F} &&
+                   anchor.target == rgui::AnchorPoint{0.5F, 0.0F} &&
                    anchor.offsetX == 0.0F && anchor.offsetY == 32.0F
-                   && secondAnchor && secondAnchor->self == rgui::AnchorPoint::topRight &&
-                   secondAnchor->target == rgui::AnchorPoint::topRight &&
+                   && secondAnchor && secondAnchor->self == rgui::AnchorPoint{1.0F, 0.0F} &&
+                   secondAnchor->target == rgui::AnchorPoint{1.0F, 0.0F} &&
                    secondAnchor->offsetX == -12.0F && secondAnchor->offsetY == 32.0F
                    && stats->columns() == 2 && stats->header(0) == "Stat" && stats->header(1) == "Value"
                    && stats->children().size() == 2

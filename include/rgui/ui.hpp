@@ -142,20 +142,24 @@ private:
     Size size_;
 };
 
-enum class AnchorPoint {
-    topLeft, top, topRight,
-    left, center, right,
-    bottomLeft, bottom, bottomRight,
+/// A normalized point within a rectangle. `{0.0F, 0.0F}` is its top-left
+/// corner and `{1.0F, 1.0F}` is its bottom-right corner.
+struct AnchorPoint {
+    float x = 0.0F;
+    float y = 0.0F;
+
+    constexpr bool operator==(const AnchorPoint&) const = default;
 };
 
-/// Positions a child relative to an AnchoredPanel. Both points refer to their
-/// respective rectangles; the child is placed so these points coincide before
-/// the pixel offset is applied. A second anchor can be supplied to an
-/// AnchoredPanel child; differing self points on an axis derive a size
-/// proposal for that axis.
+/// Positions a child relative to an AnchoredPanel. `self` and `target` are
+/// normalized points in their respective rectangles; the child is placed so
+/// these points coincide before the pixel offset is applied. A second anchor
+/// can be supplied to an AnchoredPanel child; differing self points on an axis
+/// derive a size proposal for that axis. Fractions must be finite and in the
+/// inclusive range from zero to one.
 struct Anchor {
-    AnchorPoint self = AnchorPoint::topLeft;
-    AnchorPoint target = AnchorPoint::topLeft;
+    AnchorPoint self{};
+    AnchorPoint target{};
     float offsetX = 0.0F;
     float offsetY = 0.0F;
 };
