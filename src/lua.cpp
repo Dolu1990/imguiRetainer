@@ -34,17 +34,6 @@ std::pair<float, PanelExtent> panel_extent_from_lua(const sol::object& value) {
     throw std::invalid_argument("panel extent must be a number or the string 'fill'");
 }
 
-NodePtr node_from_lua(const sol::object& value) {
-    if (value.is<std::shared_ptr<Window>>()) return value.as<std::shared_ptr<Window>>();
-    if (value.is<std::shared_ptr<Stack>>()) return value.as<std::shared_ptr<Stack>>();
-    if (value.is<std::shared_ptr<Table>>()) return value.as<std::shared_ptr<Table>>();
-    if (value.is<std::shared_ptr<ScrollArea>>()) return value.as<std::shared_ptr<ScrollArea>>();
-    if (value.is<std::shared_ptr<AnchoredPanel>>()) return value.as<std::shared_ptr<AnchoredPanel>>();
-    if (value.is<std::shared_ptr<Text>>()) return value.as<std::shared_ptr<Text>>();
-    if (value.is<std::shared_ptr<Button>>()) return value.as<std::shared_ptr<Button>>();
-    throw std::invalid_argument("expected an rgui node");
-}
-
 struct LuaButtonCallback {
     sol::function function;
     std::function<void(sol::function&, std::vector<sol::object>&)> execute;
@@ -80,8 +69,8 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
             [locked](Node& node, bool value) { locked([&] { node.setEnabled(value); }); }));
     state.new_usertype<Container>("rgui.Container", sol::no_constructor,
         sol::base_classes, sol::bases<Node>(),
-        "append", [locked](Container& parent, const sol::object& child) {
-            locked([&] { parent.append(node_from_lua(child)); });
+        "append", [locked](Container& parent, Node& child) {
+            locked([&] { parent.append(child.shared_from_this()); });
         },
         "clear", [locked](Container& container) { locked([&] { container.clear(); }); });
     state.new_usertype<Stack>("rgui.Stack", sol::no_constructor,
@@ -119,44 +108,44 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
     state.new_usertype<AnchoredPanel>("rgui.AnchoredPanel", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>(),
         "append", sol::overload(
-            [locked](AnchoredPanel& panel, const sol::object& child) {
-                locked([&] { panel.append(node_from_lua(child)); });
+            [locked](AnchoredPanel& panel, Node& child) {
+                locked([&] { panel.append(child.shared_from_this()); });
             },
-            [locked](AnchoredPanel& panel, const sol::object& child, float selfX, float selfY,
+            [locked](AnchoredPanel& panel, Node& child, float selfX, float selfY,
                float targetX, float targetY, float offsetX, float offsetY) {
                 locked([&] {
-                    panel.append(node_from_lua(child),
+                    panel.append(child.shared_from_this(),
                                  anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY));
                 });
             },
-            [locked](AnchoredPanel& panel, const sol::object& child, float primarySelfX, float primarySelfY,
+            [locked](AnchoredPanel& panel, Node& child, float primarySelfX, float primarySelfY,
                float primaryTargetX, float primaryTargetY, float primaryOffsetX, float primaryOffsetY,
                float secondarySelfX, float secondarySelfY, float secondaryTargetX, float secondaryTargetY,
                float secondaryOffsetX, float secondaryOffsetY) {
                 locked([&] {
-                    panel.append(node_from_lua(child),
+                    panel.append(child.shared_from_this(),
                                  anchor_from_lua(primarySelfX, primarySelfY, primaryTargetX, primaryTargetY,
                                                  primaryOffsetX, primaryOffsetY),
                                  anchor_from_lua(secondarySelfX, secondarySelfY, secondaryTargetX, secondaryTargetY,
                                                  secondaryOffsetX, secondaryOffsetY));
                 });
             }),
-        "setAnchor", [locked](AnchoredPanel& panel, const sol::object& child, float selfX, float selfY,
+        "setAnchor", [locked](AnchoredPanel& panel, Node& child, float selfX, float selfY,
                            float targetX, float targetY, float offsetX, float offsetY) {
             locked([&] {
-                panel.setAnchor(*node_from_lua(child),
+                panel.setAnchor(child,
                                 anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY));
             });
         },
-        "setSecondAnchor", [locked](AnchoredPanel& panel, const sol::object& child, float selfX, float selfY,
+        "setSecondAnchor", [locked](AnchoredPanel& panel, Node& child, float selfX, float selfY,
                                   float targetX, float targetY, float offsetX, float offsetY) {
             locked([&] {
-                panel.setSecondAnchor(*node_from_lua(child),
+                panel.setSecondAnchor(child,
                                       anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY));
             });
         },
-        "clearSecondAnchor", [locked](AnchoredPanel& panel, const sol::object& child) {
-            locked([&] { panel.setSecondAnchor(*node_from_lua(child), std::nullopt); });
+        "clearSecondAnchor", [locked](AnchoredPanel& panel, Node& child) {
+            locked([&] { panel.setSecondAnchor(child, std::nullopt); });
         });
     state.new_usertype<Text>("rgui.Text", sol::no_constructor,
         sol::base_classes, sol::bases<Node>(),
@@ -180,8 +169,8 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
         },
         "activate", [locked](Button& button) { locked([&] { button.activate(); }); });
     state.new_usertype<UiTree>("rgui.UiTree", sol::constructors<UiTree()>(),
-        "setRoot", [locked](UiTree& tree, const sol::object& root) {
-            locked([&] { tree.setRoot(node_from_lua(root)); });
+        "setRoot", [locked](UiTree& tree, Node& root) {
+            locked([&] { tree.setRoot(root.shared_from_this()); });
         },
         "draw", [locked](UiTree& tree) { locked([&] { tree.draw(); }); },
         "flushEvents", [locked](UiTree& tree) { return locked([&] { return tree.flushEvents(); }); });

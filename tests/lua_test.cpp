@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <mutex>
+#include <iostream>
 #include <stdexcept>
 
 int main() {
@@ -25,23 +26,40 @@ int main() {
         stats:append(rgui.text("Health"))
         stats:append(rgui.text("100"))
         log:append(rgui.text("First log entry"))
+        all_nodes = rgui.stack("vertical")
+        all_nodes:append(rgui.window("Window"))
+        all_nodes:append(rgui.stack("horizontal"))
+        all_nodes:append(rgui.table(1))
+        all_nodes:append(rgui.scrollArea(100, 50))
+        all_nodes:append(rgui.anchoredPanel(100, 50))
+        all_nodes:append(rgui.text("Text"))
+        all_nodes:append(rgui.button("Button"))
         panel:append(label, 0, 0, 0, 0, 12, 12)
         panel:append(action, 0.5, 0, 0.5, 0, 0, 32)
         panel:setSecondAnchor(action, 1, 0, 1, 0, -12, 32)
     )", sol::script_pass_on_error);
-    if (!result.valid()) return 1;
+    if (!result.valid()) {
+        const sol::error error = result;
+        std::cerr << error.what() << '\n';
+        return 1;
+    }
 
     const sol::protected_function_result callback_result = lua.safe_script(R"(
         failing_button = rgui.button("Fails")
         failing_button:onClick(function() error("intentional callback failure") end)
     )", sol::script_pass_on_error);
-    if (!callback_result.valid()) return 1;
+    if (!callback_result.valid()) {
+        const sol::error error = callback_result;
+        std::cerr << error.what() << '\n';
+        return 1;
+    }
 
     const std::shared_ptr<rgui::AnchoredPanel> panel = lua["panel"];
     const std::shared_ptr<rgui::AnchoredPanel> full_panel = lua["full_panel"];
     const std::shared_ptr<rgui::Button> action = lua["action"];
     const std::shared_ptr<rgui::Table> stats = lua["stats"];
     const std::shared_ptr<rgui::ScrollArea> log = lua["log"];
+    const std::shared_ptr<rgui::Stack> all_nodes = lua["all_nodes"];
     const rgui::Anchor anchor = panel->anchor(*action);
     const std::optional<rgui::Anchor>& secondAnchor = panel->secondAnchor(*action);
     const std::shared_ptr<rgui::Button> failing_button = lua["failing_button"];
@@ -66,6 +84,7 @@ int main() {
                    && stats->columns() == 2 && stats->header(0) == "Stat" && stats->header(1) == "Value"
                    && stats->children().size() == 2
                    && log->size().width == 240.0F && log->size().height == 80.0F
+                   && all_nodes->children().size() == 7
                    && callback_error_propagated
                ? 0
                : 1;
