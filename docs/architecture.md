@@ -65,6 +65,11 @@ Callback errors, including Lua errors, propagate from `flushEvents()` to the
 embedding application. Structural changes (`append`, `remove`, or `clear`) are
 not permitted while `UiTree::draw()` is running.
 
+`bindLua` receives an embedding-owned `std::recursive_mutex`. It serializes all
+Lua-exposed rgui object access with the embedding application's draw and event
+flush points. The embedding must still ensure Lua callbacks are flushed on the
+Lua-owning thread; the mutex does not make Lua state access thread-safe.
+
 ## Build checks
 
 ```sh

@@ -1,5 +1,6 @@
 #pragma once
 #include <functional>
+#include <mutex>
 #include <sol/sol.hpp>
 
 namespace sol {
@@ -13,6 +14,8 @@ extern void callbackExecuteDefault(sol::function& callback, std::vector<sol::obj
 
 /// Registers the script-facing rgui API in an embedding application's Lua state.
 /// The caller owns the state, its allocator, libraries, and script execution policy.
-extern void bindLua(sol::state_view state, std::function<void(sol::function&, std::vector<sol::object>&)> callbackExecute);
+/// Every Lua interaction with an rgui object is serialized through mutex.
+extern void bindLua(sol::state_view state, std::recursive_mutex& mutex,
+                    std::function<void(sol::function&, std::vector<sol::object>&)> callbackExecute);
 
 } // namespace rgui

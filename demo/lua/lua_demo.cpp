@@ -48,7 +48,8 @@ int main() {
 
     sol::state lua;
     lua.open_libraries(sol::lib::base);
-    rgui::bindLua(lua, rgui::callbackExecuteDefault);
+    std::recursive_mutex mutex;
+    rgui::bindLua(lua, mutex, rgui::callbackExecuteDefault);
 
     const sol::protected_function_result result = lua.safe_script(R"(
         local root = rgui.window("Lua-built retained rgui")

@@ -5,6 +5,7 @@
 #include <sol/sol.hpp>
 
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -44,6 +45,11 @@ NodePtr node_from_lua(const sol::object& value) {
     throw std::invalid_argument("expected an rgui node");
 }
 
+struct LuaButtonCallback {
+    sol::function function;
+    std::function<void(sol::function&, std::vector<sol::object>&)> execute;
+};
+
 } // namespace
 
 
@@ -56,113 +62,156 @@ void callbackExecuteDefault(sol::function& callback, std::vector<sol::object>& a
     }
 }
 
-void bindLua(sol::state_view state, std::function<void(sol::function&, std::vector<sol::object>&)> callbackExecute) {
+void bindLua(sol::state_view state, std::recursive_mutex& mutex,
+             std::function<void(sol::function&, std::vector<sol::object>&)> callbackExecute) {
     sol::table api = state["rgui"].get_or_create<sol::table>();
+    const auto locked = [&mutex](auto&& body) -> decltype(auto) {
+        std::lock_guard guard(mutex);
+        return std::forward<decltype(body)>(body)();
+    };
 
     state.new_usertype<Node>("rgui.Node", sol::no_constructor,
-        "id", &Node::id,
-        "visible", sol::property(&Node::visible, &Node::setVisible),
-        "enabled", sol::property(&Node::enabled, &Node::setEnabled));
+        "id", [locked](const Node& node) { return locked([&] { return node.id(); }); },
+        "visible", sol::property(
+            [locked](const Node& node) { return locked([&] { return node.visible(); }); },
+            [locked](Node& node, bool value) { locked([&] { node.setVisible(value); }); }),
+        "enabled", sol::property(
+            [locked](const Node& node) { return locked([&] { return node.enabled(); }); },
+            [locked](Node& node, bool value) { locked([&] { node.setEnabled(value); }); }));
     state.new_usertype<Container>("rgui.Container", sol::no_constructor,
         sol::base_classes, sol::bases<Node>(),
-        "append", [](Container& parent, const sol::object& child) { parent.append(node_from_lua(child)); },
-        "clear", &Container::clear);
+        "append", [locked](Container& parent, const sol::object& child) {
+            locked([&] { parent.append(node_from_lua(child)); });
+        },
+        "clear", [locked](Container& container) { locked([&] { container.clear(); }); });
     state.new_usertype<Stack>("rgui.Stack", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>(),
         "axis", sol::property(
-            [](const Stack& stack) { return axis_to_string(stack.axis()); },
-            [](Stack& stack, const std::string& value) { stack.setAxis(axis_from_string(value)); }));
+            [locked](const Stack& stack) { return locked([&] { return axis_to_string(stack.axis()); }); },
+            [locked](Stack& stack, const std::string& value) {
+                locked([&] { stack.setAxis(axis_from_string(value)); });
+            }));
     state.new_usertype<Window>("rgui.Window", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>(),
         "title", sol::property(
-            [](const Window& window) { return std::string(window.title()); },
-            [](Window& window, const std::string& value) { window.setTitle(value); }));
+            [locked](const Window& window) { return locked([&] { return std::string(window.title()); }); },
+            [locked](Window& window, const std::string& value) { locked([&] { window.setTitle(value); }); }));
     state.new_usertype<Table>("rgui.Table", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>(),
-        "columns", &Table::columns,
-        "setHeader", [](Table& table, std::size_t column, const std::string& value) {
-            if (column == 0) throw std::invalid_argument("table column indices start at 1");
-            table.setHeader(column - 1, value);
+        "columns", [locked](const Table& table) { return locked([&] { return table.columns(); }); },
+        "setHeader", [locked](Table& table, std::size_t column, const std::string& value) {
+            locked([&] {
+                if (column == 0) throw std::invalid_argument("table column indices start at 1");
+                table.setHeader(column - 1, value);
+            });
         },
-        "header", [](const Table& table, std::size_t column) {
-            if (column == 0) throw std::invalid_argument("table column indices start at 1");
-            return std::string(table.header(column - 1));
+        "header", [locked](const Table& table, std::size_t column) {
+            return locked([&] {
+                if (column == 0) throw std::invalid_argument("table column indices start at 1");
+                return std::string(table.header(column - 1));
+            });
         });
     state.new_usertype<ScrollArea>("rgui.ScrollArea", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>(),
-        "setSize", [](ScrollArea& area, float width, float height) {
-            area.setSize(Size{width, height});
+        "setSize", [locked](ScrollArea& area, float width, float height) {
+            locked([&] { area.setSize(Size{width, height}); });
         });
     state.new_usertype<AnchoredPanel>("rgui.AnchoredPanel", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>(),
         "append", sol::overload(
-            [](AnchoredPanel& panel, const sol::object& child) { panel.append(node_from_lua(child)); },
-            [](AnchoredPanel& panel, const sol::object& child, float selfX, float selfY,
-               float targetX, float targetY, float offsetX, float offsetY) {
-                panel.append(node_from_lua(child),
-                             anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY));
+            [locked](AnchoredPanel& panel, const sol::object& child) {
+                locked([&] { panel.append(node_from_lua(child)); });
             },
-            [](AnchoredPanel& panel, const sol::object& child, float primarySelfX, float primarySelfY,
+            [locked](AnchoredPanel& panel, const sol::object& child, float selfX, float selfY,
+               float targetX, float targetY, float offsetX, float offsetY) {
+                locked([&] {
+                    panel.append(node_from_lua(child),
+                                 anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY));
+                });
+            },
+            [locked](AnchoredPanel& panel, const sol::object& child, float primarySelfX, float primarySelfY,
                float primaryTargetX, float primaryTargetY, float primaryOffsetX, float primaryOffsetY,
                float secondarySelfX, float secondarySelfY, float secondaryTargetX, float secondaryTargetY,
                float secondaryOffsetX, float secondaryOffsetY) {
-                panel.append(node_from_lua(child),
-                             anchor_from_lua(primarySelfX, primarySelfY, primaryTargetX, primaryTargetY,
-                                             primaryOffsetX, primaryOffsetY),
-                             anchor_from_lua(secondarySelfX, secondarySelfY, secondaryTargetX, secondaryTargetY,
-                                             secondaryOffsetX, secondaryOffsetY));
+                locked([&] {
+                    panel.append(node_from_lua(child),
+                                 anchor_from_lua(primarySelfX, primarySelfY, primaryTargetX, primaryTargetY,
+                                                 primaryOffsetX, primaryOffsetY),
+                                 anchor_from_lua(secondarySelfX, secondarySelfY, secondaryTargetX, secondaryTargetY,
+                                                 secondaryOffsetX, secondaryOffsetY));
+                });
             }),
-        "setAnchor", [](AnchoredPanel& panel, const sol::object& child, float selfX, float selfY,
+        "setAnchor", [locked](AnchoredPanel& panel, const sol::object& child, float selfX, float selfY,
                            float targetX, float targetY, float offsetX, float offsetY) {
-            panel.setAnchor(*node_from_lua(child),
-                            anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY));
+            locked([&] {
+                panel.setAnchor(*node_from_lua(child),
+                                anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY));
+            });
         },
-        "setSecondAnchor", [](AnchoredPanel& panel, const sol::object& child, float selfX, float selfY,
+        "setSecondAnchor", [locked](AnchoredPanel& panel, const sol::object& child, float selfX, float selfY,
                                   float targetX, float targetY, float offsetX, float offsetY) {
-            panel.setSecondAnchor(*node_from_lua(child),
-                                  anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY));
+            locked([&] {
+                panel.setSecondAnchor(*node_from_lua(child),
+                                      anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY));
+            });
         },
-        "clearSecondAnchor", [](AnchoredPanel& panel, const sol::object& child) {
-            panel.setSecondAnchor(*node_from_lua(child), std::nullopt);
+        "clearSecondAnchor", [locked](AnchoredPanel& panel, const sol::object& child) {
+            locked([&] { panel.setSecondAnchor(*node_from_lua(child), std::nullopt); });
         });
     state.new_usertype<Text>("rgui.Text", sol::no_constructor,
         sol::base_classes, sol::bases<Node>(),
         "value", sol::property(
-            [](const Text& text) { return std::string(text.value()); },
-            [](Text& text, const std::string& value) { text.setValue(value); }));
+            [locked](const Text& text) { return locked([&] { return std::string(text.value()); }); },
+            [locked](Text& text, const std::string& value) { locked([&] { text.setValue(value); }); }));
     state.new_usertype<Button>("rgui.Button", sol::no_constructor,
         sol::base_classes, sol::bases<Node>(),
         "label", sol::property(
-            [](const Button& button) { return std::string(button.label()); },
-            [](Button& button, const std::string& value) { button.setLabel(value); }),
-        "onClick", [callbackExecute](Button& button, sol::function callback) {
-            button.setOnClick([callback = std::move(callback), callbackExecute](Button& clicked) mutable {
-                std::vector<sol::object> args;
-                callbackExecute(callback, args);
+            [locked](const Button& button) { return locked([&] { return std::string(button.label()); }); },
+            [locked](Button& button, const std::string& value) { locked([&] { button.setLabel(value); }); }),
+        "onClick", [locked, callbackExecute](Button& button, sol::function callback) {
+            auto luaCallback = std::make_shared<LuaButtonCallback>(
+                LuaButtonCallback{std::move(callback), callbackExecute});
+            locked([&] {
+                button.setOnClick([luaCallback](Button&) {
+                    std::vector<sol::object> args;
+                    luaCallback->execute(luaCallback->function, args);
+                });
             });
         },
-        "activate", &Button::activate);
+        "activate", [locked](Button& button) { locked([&] { button.activate(); }); });
     state.new_usertype<UiTree>("rgui.UiTree", sol::constructors<UiTree()>(),
-        "setRoot", [](UiTree& tree, const sol::object& root) { tree.setRoot(node_from_lua(root)); },
-        "draw", &UiTree::draw,
-        "flushEvents", &UiTree::flushEvents);
+        "setRoot", [locked](UiTree& tree, const sol::object& root) {
+            locked([&] { tree.setRoot(node_from_lua(root)); });
+        },
+        "draw", [locked](UiTree& tree) { locked([&] { tree.draw(); }); },
+        "flushEvents", [locked](UiTree& tree) { return locked([&] { return tree.flushEvents(); }); });
 
-    api.set_function("stack", [](const std::string& axis) {
-        return std::make_shared<Stack>(axis_from_string(axis));
+    api.set_function("stack", [locked](const std::string& axis) {
+        return locked([&] { return std::make_shared<Stack>(axis_from_string(axis)); });
     });
-    api.set_function("anchoredPanel", [](const sol::object& width, const sol::object& height) {
-        const auto [width_value, width_extent] = panel_extent_from_lua(width);
-        const auto [height_value, height_extent] = panel_extent_from_lua(height);
-        return std::make_shared<AnchoredPanel>(Size{width_value, height_value}, width_extent, height_extent);
+    api.set_function("anchoredPanel", [locked](const sol::object& width, const sol::object& height) {
+        return locked([&] {
+            const auto [width_value, width_extent] = panel_extent_from_lua(width);
+            const auto [height_value, height_extent] = panel_extent_from_lua(height);
+            return std::make_shared<AnchoredPanel>(Size{width_value, height_value}, width_extent, height_extent);
+        });
     });
-    api.set_function("window", [](const std::string& title) { return std::make_shared<Window>(title); });
-    api.set_function("table", [](std::size_t columns) { return std::make_shared<Table>(columns); });
-    api.set_function("scrollArea", [](float width, float height) {
-        return std::make_shared<ScrollArea>(Size{width, height});
+    api.set_function("window", [locked](const std::string& title) {
+        return locked([&] { return std::make_shared<Window>(title); });
     });
-    api.set_function("text", [](const std::string& value) { return std::make_shared<Text>(value); });
-    api.set_function("button", [](const std::string& label) { return std::make_shared<Button>(label); });
-    api.set_function("tree", [] { return UiTree{}; });
+    api.set_function("table", [locked](std::size_t columns) {
+        return locked([&] { return std::make_shared<Table>(columns); });
+    });
+    api.set_function("scrollArea", [locked](float width, float height) {
+        return locked([&] { return std::make_shared<ScrollArea>(Size{width, height}); });
+    });
+    api.set_function("text", [locked](const std::string& value) {
+        return locked([&] { return std::make_shared<Text>(value); });
+    });
+    api.set_function("button", [locked](const std::string& label) {
+        return locked([&] { return std::make_shared<Button>(label); });
+    });
+    api.set_function("tree", [locked] { return locked([] { return UiTree{}; }); });
 }
 
 } // namespace rgui

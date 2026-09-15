@@ -4,12 +4,14 @@
 #include <sol/sol.hpp>
 
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 
 int main() {
     sol::state lua;
     lua.open_libraries(sol::lib::base);
-    rgui::bindLua(lua);
+    std::recursive_mutex mutex;
+    rgui::bindLua(lua, mutex, rgui::callbackExecuteDefault);
 
     const sol::protected_function_result result = lua.safe_script(R"(
         panel = rgui.anchoredPanel(320, 100)
