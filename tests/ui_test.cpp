@@ -4,6 +4,7 @@
 #include <imgui_internal.h>
 
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <type_traits>
@@ -90,6 +91,20 @@ int main() {
     auto root = std::make_shared<rgui::Window>("test window");
     auto first = std::make_shared<rgui::Button>("first");
     auto second = std::make_shared<rgui::Text>("second");
+    expect(first->fontScale() == 1.0F && second->fontScale() == 1.0F);
+    first->setFontScale(2.0F);
+    second->setFontScale(2.0F);
+    expect(first->fontScale() == 2.0F && second->fontScale() == 2.0F);
+    for (const float invalid : {0.0F, -1.0F, std::numeric_limits<float>::infinity(),
+                                std::numeric_limits<float>::quiet_NaN()}) {
+        bool text_rejected = false;
+        bool button_rejected = false;
+        try { second->setFontScale(invalid); } catch (const std::invalid_argument&) { text_rejected = true; }
+        try { first->setFontScale(invalid); } catch (const std::invalid_argument&) { button_rejected = true; }
+        expect(text_rejected && button_rejected && second->fontScale() == 2.0F && first->fontScale() == 2.0F);
+    }
+    first->setFontScale(1.0F);
+    second->setFontScale(1.0F);
     root->append(first);
     root->append(second);
     rgui::UiTree tree;
@@ -242,9 +257,26 @@ int main() {
     table->append(std::make_shared<rgui::Text>("100"));
     root->append(table);
     expect(table->columns() == 2 && table->header(0) == "Name" && table->children().size() == 2);
-    expect(table->verticalBorders());
+    expect(table->innerHorizontalBorders() && table->outerHorizontalBorders() &&
+           table->innerVerticalBorders() && table->outerVerticalBorders());
+    table->setInnerHorizontalBorders(false);
+    expect(!table->innerHorizontalBorders() && table->outerHorizontalBorders() &&
+           table->innerVerticalBorders() && table->outerVerticalBorders());
+    table->setOuterHorizontalBorders(false);
+    expect(!table->innerHorizontalBorders() && !table->outerHorizontalBorders() &&
+           table->innerVerticalBorders() && table->outerVerticalBorders());
+    table->setHorizontalBorders(true);
+    expect(table->innerHorizontalBorders() && table->outerHorizontalBorders() &&
+           table->innerVerticalBorders() && table->outerVerticalBorders());
+    table->setInnerVerticalBorders(false);
+    expect(table->innerHorizontalBorders() && table->outerHorizontalBorders() &&
+           !table->innerVerticalBorders() && table->outerVerticalBorders());
+    table->setOuterVerticalBorders(false);
+    expect(table->innerHorizontalBorders() && table->outerHorizontalBorders() &&
+           !table->innerVerticalBorders() && !table->outerVerticalBorders());
     table->setVerticalBorders(false);
-    expect(!table->verticalBorders());
+    expect(table->innerHorizontalBorders() && table->outerHorizontalBorders() &&
+           !table->innerVerticalBorders() && !table->outerVerticalBorders());
     table->setVerticalBorders(true);
     table->setColumnFit(0);
     table->setColumnWeight(1, 2.0F);
@@ -313,6 +345,29 @@ int main() {
     int height = 0;
     ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
     ImGui::NewFrame();
+    rgui::Text scaled_text("font scaling");
+    const rgui::Size normal_text_size = scaled_text.measure();
+    const float font_size_before = ImGui::GetFontSize();
+    scaled_text.setFontScale(2.0F);
+    const rgui::Size scaled_text_size = scaled_text.measure();
+    expect(std::fabs(scaled_text_size.width - normal_text_size.width * 2.0F) < 1.0F &&
+           std::fabs(scaled_text_size.height - normal_text_size.height * 2.0F) < 1.0F &&
+           ImGui::GetFontSize() == font_size_before);
+    scaled_text.draw();
+    expect(ImGui::GetFontSize() == font_size_before);
+
+    rgui::Button scaled_button("font scaling");
+    const rgui::Size normal_button_size = scaled_button.measure();
+    const ImVec2 frame_padding = ImGui::GetStyle().FramePadding;
+    scaled_button.setFontScale(2.0F);
+    const rgui::Size scaled_button_size = scaled_button.measure();
+    expect(std::fabs(scaled_button_size.width -
+                     ((normal_button_size.width - frame_padding.x * 2.0F) * 2.0F + frame_padding.x * 2.0F)) < 1.0F &&
+           std::fabs(scaled_button_size.height -
+                     ((normal_button_size.height - frame_padding.y * 2.0F) * 2.0F + frame_padding.y * 2.0F)) < 1.0F &&
+           ImGui::GetFontSize() == font_size_before);
+    scaled_button.draw();
+    expect(ImGui::GetFontSize() == font_size_before);
     CustomNode custom;
     custom.draw();
     tree.draw();

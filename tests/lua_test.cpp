@@ -19,6 +19,10 @@ int main() {
         full_panel = rgui.anchoredPanel("fill", "fill")
         label = rgui.text("Status")
         action = rgui.button("Continue")
+        label:setFontScale(2)
+        action:setFontScale(2)
+        lua_text_font_scale = label:fontScale()
+        lua_button_font_scale = action:fontScale()
         stats = rgui.table(2)
         log = rgui.scrollArea(240, 80)
         stats:setHeader(1, "Stat")
@@ -26,7 +30,16 @@ int main() {
         stats:setColumnFit(1)
         stats:setColumnWidth(2, 80)
         stats:setColumnJustify(2, "right_center")
+        stats:setInnerHorizontalBorders(false)
+        stats:setOuterHorizontalBorders(false)
+        stats:setHorizontalBorders(true)
+        stats:setInnerVerticalBorders(false)
+        stats:setOuterVerticalBorders(true)
         stats:setVerticalBorders(false)
+        lua_border_state = stats:innerHorizontalBorders()
+            and stats:outerHorizontalBorders()
+            and not stats:innerVerticalBorders()
+            and not stats:outerVerticalBorders()
         alignment_names = {
             "left", "top", "right",
             "left_top", "center_top", "right_top",
@@ -109,10 +122,15 @@ int main() {
     const sol::protected_function_result invalid_window_extent = lua.safe_script(R"(
         overlay:setScreenLayout("wide", 50, rgui.Anchor("top_left", "top_left"))
     )", sol::script_pass_on_error);
+    const sol::protected_function_result invalid_text_font_scale = lua.safe_script(
+        "label:setFontScale(0)", sol::script_pass_on_error);
+    const sol::protected_function_result invalid_button_font_scale = lua.safe_script(
+        "action:setFontScale(-1)", sol::script_pass_on_error);
     if (invalid_anchor_name.valid() || invalid_anchor_fraction.valid() ||
         invalid_table_sizing.valid() || invalid_table_width.valid() ||
         invalid_table_justification.valid() || invalid_justification_name.valid() ||
-        invalid_window_alpha.valid() || invalid_window_extent.valid()) return 1;
+        invalid_window_alpha.valid() || invalid_window_extent.valid() ||
+        invalid_text_font_scale.valid() || invalid_button_font_scale.valid()) return 1;
 
     const sol::protected_function_result callback_result = lua.safe_script(R"(
         failing_button = rgui.button("Fails")
@@ -126,6 +144,7 @@ int main() {
 
     const std::shared_ptr<rgui::AnchoredPanel> panel = lua["panel"];
     const std::shared_ptr<rgui::AnchoredPanel> full_panel = lua["full_panel"];
+    const std::shared_ptr<rgui::Text> label = lua["label"];
     const std::shared_ptr<rgui::Button> action = lua["action"];
     const std::shared_ptr<rgui::Button> stretched = lua["stretched"];
     const rgui::Anchor numeric_anchor = lua["numeric_anchor"];
@@ -176,12 +195,17 @@ int main() {
                    stretched_second_anchor->target == rgui::AnchorPoint{1.0F, 0.0F} &&
                    stretched_second_anchor->offsetX == -12.0F && stretched_second_anchor->offsetY == 64.0F
                    && stats->columns() == 2 && stats->header(0) == "Stat" && stats->header(1) == "Value"
-                   && stats->children().size() == 2 && !stats->verticalBorders()
+                   && stats->children().size() == 2 && lua["lua_border_state"].get<bool>()
+                   && stats->innerHorizontalBorders() && stats->outerHorizontalBorders()
+                   && !stats->innerVerticalBorders() && !stats->outerVerticalBorders()
                    && log->size().width == 240.0F && log->size().height == 80.0F
                    && all_nodes->children().size() == 7
                    && overlay->backgroundAlpha() == 0.4F && !overlay->decorated() && !overlay->movable() &&
                    !overlay->resizable() && overlay->screenLayout() &&
                    overlay->screenLayout()->secondary
+                   && label->fontScale() == 2.0F && action->fontScale() == 2.0F
+                   && lua["lua_text_font_scale"].get<float>() == 2.0F
+                   && lua["lua_button_font_scale"].get<float>() == 2.0F
                    && callback_error_propagated && lua_click_callbacks_work
                ? 0
                : 1;

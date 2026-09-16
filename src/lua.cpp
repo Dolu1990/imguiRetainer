@@ -247,6 +247,33 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
                 table.setColumnJustify(column - 1, horizontal, vertical);
             });
         },
+        "setInnerHorizontalBorders", [locked](Table& table, bool value) {
+            locked([&] { table.setInnerHorizontalBorders(value); });
+        },
+        "innerHorizontalBorders", [locked](const Table& table) {
+            return locked([&] { return table.innerHorizontalBorders(); });
+        },
+        "setOuterHorizontalBorders", [locked](Table& table, bool value) {
+            locked([&] { table.setOuterHorizontalBorders(value); });
+        },
+        "outerHorizontalBorders", [locked](const Table& table) {
+            return locked([&] { return table.outerHorizontalBorders(); });
+        },
+        "setInnerVerticalBorders", [locked](Table& table, bool value) {
+            locked([&] { table.setInnerVerticalBorders(value); });
+        },
+        "innerVerticalBorders", [locked](const Table& table) {
+            return locked([&] { return table.innerVerticalBorders(); });
+        },
+        "setOuterVerticalBorders", [locked](Table& table, bool value) {
+            locked([&] { table.setOuterVerticalBorders(value); });
+        },
+        "outerVerticalBorders", [locked](const Table& table) {
+            return locked([&] { return table.outerVerticalBorders(); });
+        },
+        "setHorizontalBorders", [locked](Table& table, bool value) {
+            locked([&] { table.setHorizontalBorders(value); });
+        },
         "setVerticalBorders", [locked](Table& table, bool value) {
             locked([&] { table.setVerticalBorders(value); });
         });
@@ -310,6 +337,12 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
         "value", sol::property(
             [locked](const Text& text) { return locked([&] { return std::string(text.value()); }); },
             [locked](Text& text, const std::string& value) { locked([&] { text.setValue(value); }); }),
+        "setFontScale", [locked](Text& text, float scale) {
+            locked([&] { text.setFontScale(scale); });
+        },
+        "fontScale", [locked](const Text& text) {
+            return locked([&] { return text.fontScale(); });
+        },
         "onClick", [locked, callbackExecute](Text& text, sol::function callback) {
             auto luaCallback = std::make_shared<LuaNodeCallback>(
                 LuaNodeCallback{std::move(callback), callbackExecute});
@@ -326,6 +359,12 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
         "label", sol::property(
             [locked](const Button& button) { return locked([&] { return std::string(button.label()); }); },
             [locked](Button& button, const std::string& value) { locked([&] { button.setLabel(value); }); }),
+        "setFontScale", [locked](Button& button, float scale) {
+            locked([&] { button.setFontScale(scale); });
+        },
+        "fontScale", [locked](const Button& button) {
+            return locked([&] { return button.fontScale(); });
+        },
         "onClick", [locked, callbackExecute](Button& button, sol::function callback) {
             auto luaCallback = std::make_shared<LuaNodeCallback>(
                 LuaNodeCallback{std::move(callback), callbackExecute});

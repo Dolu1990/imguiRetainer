@@ -126,8 +126,16 @@ public:
     /// Positions every cell in this column within its available cell rectangle.
     void setColumnJustify(std::size_t column, Justification horizontal,
                           Justification vertical);
+    void setInnerHorizontalBorders(bool value) noexcept;
+    [[nodiscard]] bool innerHorizontalBorders() const noexcept { return inner_horizontal_borders_; }
+    void setOuterHorizontalBorders(bool value) noexcept;
+    [[nodiscard]] bool outerHorizontalBorders() const noexcept { return outer_horizontal_borders_; }
+    void setInnerVerticalBorders(bool value) noexcept;
+    [[nodiscard]] bool innerVerticalBorders() const noexcept { return inner_vertical_borders_; }
+    void setOuterVerticalBorders(bool value) noexcept;
+    [[nodiscard]] bool outerVerticalBorders() const noexcept { return outer_vertical_borders_; }
+    void setHorizontalBorders(bool value) noexcept;
     void setVerticalBorders(bool value) noexcept;
-    [[nodiscard]] bool verticalBorders() const noexcept { return vertical_borders_; }
     void draw() override;
 
 private:
@@ -142,7 +150,10 @@ private:
     [[nodiscard]] Column& column(std::size_t index);
     [[nodiscard]] const Column& column(std::size_t index) const;
     std::vector<Column> columns_;
-    bool vertical_borders_ = true;
+    bool inner_horizontal_borders_ = true;
+    bool outer_horizontal_borders_ = true;
+    bool inner_vertical_borders_ = true;
+    bool outer_vertical_borders_ = true;
 };
 
 /// Draws children in a bordered fixed-size region. Dear ImGui adds scrollbars
@@ -266,12 +277,15 @@ public:
     explicit Text(std::string value = {});
     [[nodiscard]] std::string_view value() const noexcept { return value_; }
     void setValue(std::string_view value);
+    [[nodiscard]] float fontScale() const noexcept { return font_scale_; }
+    void setFontScale(float scale);
     void setOnClick(std::function<void(Node&)> callback);
     void activate();
     [[nodiscard]] Size measure() const override;
     void draw() override;
 private:
     std::string value_;
+    float font_scale_ = 1.0F;
     std::function<void(Node&)> on_click_;
 };
 
@@ -280,6 +294,8 @@ public:
     explicit Button(std::string label = {});
     [[nodiscard]] std::string_view label() const noexcept { return label_; }
     void setLabel(std::string_view value);
+    [[nodiscard]] float fontScale() const noexcept { return font_scale_; }
+    void setFontScale(float scale);
     void setOnClick(std::function<void(Node&)> callback);
     void activate();
     [[nodiscard]] Size measure() const override;
@@ -288,6 +304,7 @@ public:
     void draw(Size resolved_size) override;
 private:
     std::string label_;
+    float font_scale_ = 1.0F;
     std::function<void(Node&)> on_click_;
 };
 

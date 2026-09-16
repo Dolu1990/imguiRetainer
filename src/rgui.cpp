@@ -20,6 +20,17 @@ void validate_anchor(Anchor anchor);
 std::optional<float> proposed_axis(float primary_target, float secondary_target,
                                    float primary_self, float secondary_self);
 void validate_size(Size size);
+void validate_font_scale(float scale);
+
+class ScopedFontScale final {
+public:
+    explicit ScopedFontScale(float scale) {
+        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * scale);
+    }
+    ~ScopedFontScale() { ImGui::PopFont(); }
+    ScopedFontScale(const ScopedFontScale&) = delete;
+    ScopedFontScale& operator=(const ScopedFontScale&) = delete;
+};
 }
 
 Node::Node() : id_(next_node_id.fetch_add(1, std::memory_order_relaxed)) {}
@@ -183,7 +194,18 @@ void Table::setColumnJustify(std::size_t column, Justification horizontal,
     configured.horizontal_justification = horizontal;
     configured.vertical_justification = vertical;
 }
-void Table::setVerticalBorders(bool value) noexcept { vertical_borders_ = value; }
+void Table::setInnerHorizontalBorders(bool value) noexcept { inner_horizontal_borders_ = value; }
+void Table::setOuterHorizontalBorders(bool value) noexcept { outer_horizontal_borders_ = value; }
+void Table::setInnerVerticalBorders(bool value) noexcept { inner_vertical_borders_ = value; }
+void Table::setOuterVerticalBorders(bool value) noexcept { outer_vertical_borders_ = value; }
+void Table::setHorizontalBorders(bool value) noexcept {
+    setInnerHorizontalBorders(value);
+    setOuterHorizontalBorders(value);
+}
+void Table::setVerticalBorders(bool value) noexcept {
+    setInnerVerticalBorders(value);
+    setOuterVerticalBorders(value);
+}
 
 namespace {
 float justification_offset(Justification justification, float available, float content) {
@@ -198,9 +220,11 @@ float justification_offset(Justification justification, float available, float c
 } // namespace
 
 void Table::draw() {
-    ImGuiTableFlags flags = ImGuiTableFlags_BordersH | ImGuiTableFlags_RowBg |
-                            ImGuiTableFlags_SizingStretchSame;
-    if (vertical_borders_) flags |= ImGuiTableFlags_BordersV;
+    ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchSame;
+    if (inner_horizontal_borders_) flags |= ImGuiTableFlags_BordersInnerH;
+    if (outer_horizontal_borders_) flags |= ImGuiTableFlags_BordersOuterH;
+    if (inner_vertical_borders_) flags |= ImGuiTableFlags_BordersInnerV;
+    if (outer_vertical_borders_) flags |= ImGuiTableFlags_BordersOuterV;
     const std::string table_id = "##rgui-table-" + std::to_string(id());
     if (!ImGui::BeginTable(table_id.c_str(), static_cast<int>(columns()), flags)) {
         return;
@@ -267,6 +291,12 @@ void ScrollArea::draw() {
 }
 
 namespace {
+void validate_font_scale(float scale) {
+    if (!std::isfinite(scale) || scale <= 0.0F) {
+        throw std::invalid_argument("rgui font scale must be finite and greater than zero");
+    }
+}
+
 ImVec2 point_in_rect(AnchorPoint point, Size size) {
     return {point.x * size.width, point.y * size.height};
 }
@@ -387,21 +417,28 @@ void AnchoredPanel::draw() {
 
 Text::Text(std::string value) : value_(std::move(value)) {}
 void Text::setValue(std::string_view value) { value_ = value; }
+void Text::setFontScale(float scale) { validate_font_scale(scale); font_scale_ = scale; }
 void Text::setOnClick(std::function<void(Node&)> callback) { on_click_ = std::move(callback); }
 void Text::activate() { if (visible() && enabled() && on_click_ && tree_) tree_->enqueue_event(weak_from_this(), attachment_generation_, on_click_); }
 Size Text::measure() const {
+    const ScopedFontScale font(font_scale_);
     const ImVec2 size = ImGui::CalcTextSize(value_.data(), value_.data() + value_.size());
     return {size.x, size.y};
 }
 void Text::draw() {
-    ImGui::TextUnformatted(value_.data(), value_.data() + value_.size());
+    {
+        const ScopedFontScale font(font_scale_);
+        ImGui::TextUnformatted(value_.data(), value_.data() + value_.size());
+    }
     if (enabled() && ImGui::IsItemClicked(ImGuiMouseButton_Left)) activate();
 }
 Button::Button(std::string label) : label_(std::move(label)) {}
 void Button::setLabel(std::string_view value) { label_ = value; }
+void Button::setFontScale(float scale) { validate_font_scale(scale); font_scale_ = scale; }
 void Button::setOnClick(std::function<void(Node&)> callback) { on_click_ = std::move(callback); }
 void Button::activate() { if (visible() && enabled() && on_click_ && tree_) tree_->enqueue_event(weak_from_this(), attachment_generation_, on_click_); }
 Size Button::measure() const {
+    const ScopedFontScale font(font_scale_);
     const ImVec2 text_size = ImGui::CalcTextSize(label_.c_str(), nullptr, true);
     const ImVec2 padding = ImGui::GetStyle().FramePadding;
     return {text_size.x + padding.x * 2.0F, ImGui::GetFrameHeight()};
@@ -416,6 +453,7 @@ void Button::draw() {
     draw(measure());
 }
 void Button::draw(Size resolved_size) {
+    const ScopedFontScale font(font_scale_);
     if (!enabled()) ImGui::BeginDisabled();
     const bool clicked = ImGui::Button(label_.c_str(), {resolved_size.width, resolved_size.height});
     if (!enabled()) ImGui::EndDisabled();
