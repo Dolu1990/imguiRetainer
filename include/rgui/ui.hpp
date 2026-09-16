@@ -108,16 +108,6 @@ private:
     Axis axis_;
 };
 
-class Window final : public Container {
-public:
-    explicit Window(std::string title = {});
-    [[nodiscard]] std::string_view title() const noexcept { return title_; }
-    void setTitle(std::string_view value);
-    void draw() override;
-private:
-    std::string title_;
-};
-
 /// Draws children as cells in a Dear ImGui table, in row-major order. A new
 /// row is started automatically after every `columns()` visible children.
 /// Headers are optional and use zero-based column indices in C++.
@@ -192,6 +182,45 @@ struct Anchor {
 
 /// How an AnchoredPanel resolves one of its dimensions.
 enum class PanelExtent { fixed, fill };
+
+/// Describes an opt-in main-viewport layout for a Window. The primary anchor
+/// positions the window; a secondary anchor may derive its width and/or
+/// height when its corresponding self coordinate differs.
+struct WindowLayout {
+    Size size{};
+    PanelExtent widthExtent = PanelExtent::fixed;
+    PanelExtent heightExtent = PanelExtent::fixed;
+    Anchor primary{};
+    std::optional<Anchor> secondary;
+};
+
+/// A retained Dear ImGui window. Screen layout, when configured, is resolved
+/// against Dear ImGui's main viewport on every draw.
+class Window final : public Container {
+public:
+    explicit Window(std::string title = {});
+    [[nodiscard]] std::string_view title() const noexcept { return title_; }
+    void setTitle(std::string_view value);
+    [[nodiscard]] float backgroundAlpha() const noexcept { return background_alpha_; }
+    void setBackgroundAlpha(float value);
+    [[nodiscard]] bool decorated() const noexcept { return decorated_; }
+    void setDecorated(bool value) noexcept;
+    [[nodiscard]] bool movable() const noexcept { return movable_; }
+    void setMovable(bool value) noexcept;
+    [[nodiscard]] bool resizable() const noexcept { return resizable_; }
+    void setResizable(bool value) noexcept;
+    void setScreenLayout(WindowLayout value);
+    [[nodiscard]] const std::optional<WindowLayout>& screenLayout() const noexcept { return screen_layout_; }
+    void clearScreenLayout() noexcept;
+    void draw() override;
+private:
+    std::string title_;
+    float background_alpha_ = 1.0F;
+    bool decorated_ = true;
+    bool movable_ = true;
+    bool resizable_ = true;
+    std::optional<WindowLayout> screen_layout_;
+};
 
 /// A retained layout surface. Fixed dimensions use the supplied Size; fill
 /// dimensions use the current Dear ImGui content region when drawn.

@@ -1,6 +1,7 @@
 #include <rgui/rgui.hpp>
 
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include <cmath>
 #include <memory>
@@ -94,6 +95,17 @@ int main() {
     rgui::UiTree tree;
     tree.setRoot(root);
     expect(first->parent() == root.get());
+
+    rgui::Window overlay("overlay");
+    expect(overlay.backgroundAlpha() == 1.0F && overlay.decorated() && overlay.movable() && overlay.resizable());
+    overlay.setBackgroundAlpha(0.4F);
+    overlay.setDecorated(false);
+    overlay.setMovable(false);
+    overlay.setResizable(false);
+    bool rejected_window_alpha = false;
+    try { overlay.setBackgroundAlpha(1.1F); } catch (const std::invalid_argument&) { rejected_window_alpha = true; }
+    expect(rejected_window_alpha && overlay.backgroundAlpha() == 0.4F && !overlay.decorated() &&
+           !overlay.movable() && !overlay.resizable());
 
     bool activated = false;
     first->setOnClick([&activated](rgui::Node&) { activated = true; });
@@ -304,6 +316,16 @@ int main() {
     CustomNode custom;
     custom.draw();
     tree.draw();
+    overlay.setScreenLayout({{200.0F, 100.0F}, rgui::PanelExtent::fixed, rgui::PanelExtent::fixed,
+                             {{0.5F, 0.5F}, {0.5F, 0.5F}}});
+    overlay.draw();
+    const std::string overlay_name = "overlay###rgui-" + std::to_string(overlay.id());
+    ImGuiWindow* overlay_window = ImGui::FindWindowByName(overlay_name.c_str());
+    expect(overlay.screenLayout() && overlay_window && std::fabs(overlay_window->Pos.x - 220.0F) < 1.0F &&
+           std::fabs(overlay_window->Pos.y - 190.0F) < 1.0F && std::fabs(overlay_window->Size.x - 200.0F) < 1.0F &&
+           std::fabs(overlay_window->Size.y - 100.0F) < 1.0F &&
+           (overlay_window->Flags & (ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize)) ==
+               (ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize));
     expect(centred->position().x - panel_origin->position().x == 40.0F);
     expect(centred->position().y == panel_origin->position().y);
     expect(stretched->proposal().width && *stretched->proposal().width == 80.0F);
@@ -349,10 +371,24 @@ int main() {
     expect(std::fabs((justified_end->position().y - justified_start->position().y) - 20.0F) < 1.0F);
     ImGui::EndFrame();
     ImGui::NewFrame();
+    rgui::WindowLayout stretched_layout{{0.0F, 0.0F}, rgui::PanelExtent::fixed, rgui::PanelExtent::fixed,
+                                        {{0.0F, 0.0F}, {0.0F, 0.0F}}};
+    stretched_layout.secondary = rgui::Anchor{{1.0F, 1.0F}, {1.0F, 1.0F}};
+    overlay.setScreenLayout(stretched_layout);
+    overlay.draw();
+    expect(std::fabs(overlay_window->Size.x - 640.0F) < 1.0F && std::fabs(overlay_window->Size.y - 480.0F) < 1.0F);
     ImGui::Begin("scroll area test");
     scrollArea->draw();
     ImGui::End();
     expect(scroll_contents->scroll_max_y() > 0.0F);
+    ImGui::EndFrame();
+    ImGui::NewFrame();
+    overlay.setScreenLayout({{0.0F, 0.0F}, rgui::PanelExtent::fill, rgui::PanelExtent::fill,
+                             {{0.0F, 0.0F}, {0.0F, 0.0F}}});
+    overlay.draw();
+    expect(std::fabs(overlay_window->Size.x - 640.0F) < 1.0F && std::fabs(overlay_window->Size.y - 480.0F) < 1.0F);
+    overlay.clearScreenLayout();
+    expect(!overlay.screenLayout());
     ImGui::EndFrame();
     ImGui::DestroyContext();
     return failures == 0 ? 0 : 1;

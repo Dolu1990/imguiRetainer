@@ -13,7 +13,14 @@ namespace rgui {
 
 std::string_view version() noexcept { return "0.1.0"; }
 
-namespace { std::atomic<NodeId> next_node_id{1}; }
+namespace {
+std::atomic<NodeId> next_node_id{1};
+ImVec2 point_in_rect(AnchorPoint point, Size size);
+void validate_anchor(Anchor anchor);
+std::optional<float> proposed_axis(float primary_target, float secondary_target,
+                                   float primary_self, float secondary_self);
+void validate_size(Size size);
+}
 
 Node::Node() : id_(next_node_id.fetch_add(1, std::memory_order_relaxed)) {}
 void Node::setVisible(bool value) noexcept { visible_ = value; }
@@ -81,9 +88,53 @@ void Stack::draw() {
 
 Window::Window(std::string title) : title_(std::move(title)) {}
 void Window::setTitle(std::string_view value) { title_ = value; }
+void Window::setBackgroundAlpha(float value) {
+    if (!std::isfinite(value) || value < 0.0F || value > 1.0F) {
+        throw std::invalid_argument("rgui window background alpha must be finite and from 0 to 1");
+    }
+    background_alpha_ = value;
+}
+void Window::setDecorated(bool value) noexcept { decorated_ = value; }
+void Window::setMovable(bool value) noexcept { movable_ = value; }
+void Window::setResizable(bool value) noexcept { resizable_ = value; }
+void Window::setScreenLayout(WindowLayout value) {
+    validate_size(value.size);
+    validate_anchor(value.primary);
+    if (value.secondary) validate_anchor(*value.secondary);
+    screen_layout_ = std::move(value);
+}
+void Window::clearScreenLayout() noexcept { screen_layout_.reset(); }
 void Window::draw() {
+    ImGuiWindowFlags flags = ImGuiWindowFlags_None;
+    if (!decorated_) flags |= ImGuiWindowFlags_NoTitleBar;
+    if (!movable_) flags |= ImGuiWindowFlags_NoMove;
+    if (!resizable_) flags |= ImGuiWindowFlags_NoResize;
+    ImGui::SetNextWindowBgAlpha(background_alpha_);
+    if (screen_layout_) {
+        const WindowLayout& layout = *screen_layout_;
+        const ImGuiViewport* viewport = ImGui::GetMainViewport();
+        Size size = layout.size;
+        if (layout.widthExtent == PanelExtent::fill) size.width = viewport->Size.x;
+        if (layout.heightExtent == PanelExtent::fill) size.height = viewport->Size.y;
+        if (layout.secondary) {
+            const Anchor& secondary = *layout.secondary;
+            const ImVec2 primary_target = point_in_rect(layout.primary.target, {viewport->Size.x, viewport->Size.y});
+            const ImVec2 secondary_target = point_in_rect(secondary.target, {viewport->Size.x, viewport->Size.y});
+            if (const auto width = proposed_axis(primary_target.x + layout.primary.offsetX,
+                                                 secondary_target.x + secondary.offsetX,
+                                                 layout.primary.self.x, secondary.self.x)) size.width = *width;
+            if (const auto height = proposed_axis(primary_target.y + layout.primary.offsetY,
+                                                  secondary_target.y + secondary.offsetY,
+                                                  layout.primary.self.y, secondary.self.y)) size.height = *height;
+        }
+        const ImVec2 target = point_in_rect(layout.primary.target, {viewport->Size.x, viewport->Size.y});
+        const ImVec2 self = point_in_rect(layout.primary.self, {size.width, size.height});
+        ImGui::SetNextWindowPos({viewport->Pos.x + target.x + layout.primary.offsetX - self.x,
+                                 viewport->Pos.y + target.y + layout.primary.offsetY - self.y}, ImGuiCond_Always);
+        ImGui::SetNextWindowSize({size.width, size.height}, ImGuiCond_Always);
+    }
     const std::string title = title_ + "###rgui-" + std::to_string(id());
-    const bool draw_contents = ImGui::Begin(title.c_str());
+    const bool draw_contents = ImGui::Begin(title.c_str(), nullptr, flags);
     if (draw_contents) draw_children();
     ImGui::End();
 }

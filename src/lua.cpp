@@ -89,6 +89,13 @@ std::pair<float, PanelExtent> panel_extent_from_lua(const sol::object& value) {
     throw std::invalid_argument("panel extent must be a number or the string 'fill'");
 }
 
+WindowLayout window_layout_from_lua(const sol::object& width, const sol::object& height,
+                                    Anchor primary, std::optional<Anchor> secondary = std::nullopt) {
+    const auto [width_value, width_extent] = panel_extent_from_lua(width);
+    const auto [height_value, height_extent] = panel_extent_from_lua(height);
+    return {{width_value, height_value}, width_extent, height_extent, primary, secondary};
+}
+
 struct LuaNodeCallback {
     sol::function function;
     std::function<void(sol::function&, std::vector<sol::object>&)> execute;
@@ -178,7 +185,28 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
         sol::base_classes, sol::bases<Container, Node>(),
         "title", sol::property(
             [locked](const Window& window) { return locked([&] { return std::string(window.title()); }); },
-            [locked](Window& window, const std::string& value) { locked([&] { window.setTitle(value); }); }));
+            [locked](Window& window, const std::string& value) { locked([&] { window.setTitle(value); }); }),
+        "backgroundAlpha", sol::property(
+            [locked](const Window& window) { return locked([&] { return window.backgroundAlpha(); }); },
+            [locked](Window& window, float value) { locked([&] { window.setBackgroundAlpha(value); }); }),
+        "decorated", sol::property(
+            [locked](const Window& window) { return locked([&] { return window.decorated(); }); },
+            [locked](Window& window, bool value) { locked([&] { window.setDecorated(value); }); }),
+        "movable", sol::property(
+            [locked](const Window& window) { return locked([&] { return window.movable(); }); },
+            [locked](Window& window, bool value) { locked([&] { window.setMovable(value); }); }),
+        "resizable", sol::property(
+            [locked](const Window& window) { return locked([&] { return window.resizable(); }); },
+            [locked](Window& window, bool value) { locked([&] { window.setResizable(value); }); }),
+        "setScreenLayout", sol::overload(
+            [locked](Window& window, const sol::object& width, const sol::object& height, Anchor primary) {
+                locked([&] { window.setScreenLayout(window_layout_from_lua(width, height, primary)); });
+            },
+            [locked](Window& window, const sol::object& width, const sol::object& height,
+                     Anchor primary, Anchor secondary) {
+                locked([&] { window.setScreenLayout(window_layout_from_lua(width, height, primary, secondary)); });
+            }),
+        "clearScreenLayout", [locked](Window& window) { locked([&] { window.clearScreenLayout(); }); });
     state.new_usertype<Table>("rgui.Table", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>(),
         "columns", [locked](const Table& table) { return locked([&] { return table.columns(); }); },

@@ -48,6 +48,15 @@ int main() {
         all_nodes:append(rgui.anchoredPanel(100, 50))
         all_nodes:append(rgui.text("Text"))
         all_nodes:append(rgui.button("Button"))
+        overlay = rgui.window("Overlay")
+        overlay.backgroundAlpha = 0.4
+        overlay.decorated = false
+        overlay.movable = false
+        overlay.resizable = false
+        overlay:setScreenLayout("fill", 160, rgui.Anchor("top_left", "top_left"))
+        overlay:clearScreenLayout()
+        overlay:setScreenLayout(100, 50,
+            rgui.Anchor("top_left", "top_left"), rgui.Anchor("bottom_right", "bottom_right"))
         panel:append(label, 0, 0, 0, 0, 12, 12)
         named_anchor = rgui.Anchor("top", "top", 0, 32)
         numeric_anchor = rgui.Anchor(0, 0, 0, 0)
@@ -94,9 +103,16 @@ int main() {
     const sol::protected_function_result invalid_justification_name = lua.safe_script(R"(
         stats:setColumnJustify(1, "diagonal")
     )", sol::script_pass_on_error);
+    const sol::protected_function_result invalid_window_alpha = lua.safe_script(R"(
+        overlay.backgroundAlpha = -0.1
+    )", sol::script_pass_on_error);
+    const sol::protected_function_result invalid_window_extent = lua.safe_script(R"(
+        overlay:setScreenLayout("wide", 50, rgui.Anchor("top_left", "top_left"))
+    )", sol::script_pass_on_error);
     if (invalid_anchor_name.valid() || invalid_anchor_fraction.valid() ||
         invalid_table_sizing.valid() || invalid_table_width.valid() ||
-        invalid_table_justification.valid() || invalid_justification_name.valid()) return 1;
+        invalid_table_justification.valid() || invalid_justification_name.valid() ||
+        invalid_window_alpha.valid() || invalid_window_extent.valid()) return 1;
 
     const sol::protected_function_result callback_result = lua.safe_script(R"(
         failing_button = rgui.button("Fails")
@@ -122,6 +138,7 @@ int main() {
     const std::optional<rgui::Anchor>& stretched_second_anchor = panel->secondAnchor(*stretched);
     const std::shared_ptr<rgui::Button> failing_button = lua["failing_button"];
     const std::shared_ptr<rgui::Stack> callback_root = lua["callback_root"];
+    const std::shared_ptr<rgui::Window> overlay = lua["overlay"];
     const std::shared_ptr<rgui::Text> clickable_text = lua["clickable_text"];
     const std::shared_ptr<rgui::Button> clickable_button = lua["clickable_button"];
     rgui::UiTree click_tree;
@@ -162,6 +179,9 @@ int main() {
                    && stats->children().size() == 2 && !stats->verticalBorders()
                    && log->size().width == 240.0F && log->size().height == 80.0F
                    && all_nodes->children().size() == 7
+                   && overlay->backgroundAlpha() == 0.4F && !overlay->decorated() && !overlay->movable() &&
+                   !overlay->resizable() && overlay->screenLayout() &&
+                   overlay->screenLayout()->secondary
                    && callback_error_propagated && lua_click_callbacks_work
                ? 0
                : 1;
