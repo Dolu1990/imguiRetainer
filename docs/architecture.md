@@ -57,6 +57,8 @@ content axis. A real overlay, table, popup, or other composite should be a
 specialized node that expresses ImGui's own begin/end protocol directly.
 `Table` is the first such composite: it owns a fixed positive number of
 columns, optional headers, and draws visible children as row-major cells.
+Each column can justify its cell content horizontally and vertically with
+start, center, or end alignment; the default is start on both axes.
 
 Button callbacks are queued and must be delivered by `UiTree::flushEvents()`
 at an application-selected safe point. A queued callback is discarded when its

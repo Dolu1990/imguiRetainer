@@ -24,6 +24,25 @@ const char* axis_to_string(Axis value) noexcept {
     return value == Axis::horizontal ? "horizontal" : "vertical";
 }
 
+std::pair<Justification, Justification> table_justification_from_string(const std::string& value) {
+    if (value == "left") return {Justification::start, Justification::center};
+    if (value == "top") return {Justification::center, Justification::start};
+    if (value == "right") return {Justification::end, Justification::center};
+    if (value == "bottom") return {Justification::center, Justification::end};
+    if (value == "left_top") return {Justification::start, Justification::start};
+    if (value == "center_top") return {Justification::center, Justification::start};
+    if (value == "right_top") return {Justification::end, Justification::start};
+    if (value == "left_center") return {Justification::start, Justification::center};
+    if (value == "center") return {Justification::center, Justification::center};
+    if (value == "right_center") return {Justification::end, Justification::center};
+    if (value == "left_bottom") return {Justification::start, Justification::end};
+    if (value == "center_bottom") return {Justification::center, Justification::end};
+    if (value == "right_bottom") return {Justification::end, Justification::end};
+    throw std::invalid_argument(
+        "table justification must be left, top, right, left_top, center_top, right_top, "
+        "left_center, center, right_center, left_bottom, center_bottom, or right_bottom");
+}
+
 Anchor anchor_from_lua(float selfX, float selfY, float targetX, float targetY,
                        float offsetX, float offsetY) {
     return {{selfX, selfY}, {targetX, targetY}, offsetX, offsetY};
@@ -164,6 +183,34 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
                 if (column == 0) throw std::invalid_argument("table column indices start at 1");
                 return std::string(table.header(column - 1));
             });
+        },
+        "setColumnFit", [locked](Table& table, std::size_t column) {
+            locked([&] {
+                if (column == 0) throw std::invalid_argument("table column indices start at 1");
+                table.setColumnFit(column - 1);
+            });
+        },
+        "setColumnWidth", [locked](Table& table, std::size_t column, float width) {
+            locked([&] {
+                if (column == 0) throw std::invalid_argument("table column indices start at 1");
+                table.setColumnWidth(column - 1, width);
+            });
+        },
+        "setColumnWeight", [locked](Table& table, std::size_t column, float weight) {
+            locked([&] {
+                if (column == 0) throw std::invalid_argument("table column indices start at 1");
+                table.setColumnWeight(column - 1, weight);
+            });
+        },
+        "setColumnJustify", [locked](Table& table, std::size_t column, const std::string& value) {
+            locked([&] {
+                if (column == 0) throw std::invalid_argument("table column indices start at 1");
+                const auto [horizontal, vertical] = table_justification_from_string(value);
+                table.setColumnJustify(column - 1, horizontal, vertical);
+            });
+        },
+        "setVerticalBorders", [locked](Table& table, bool value) {
+            locked([&] { table.setVerticalBorders(value); });
         });
     state.new_usertype<ScrollArea>("rgui.ScrollArea", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>(),

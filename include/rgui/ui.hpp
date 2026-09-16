@@ -91,6 +91,9 @@ protected:
 
 enum class Axis { horizontal, vertical };
 
+/// Positions content within an available horizontal or vertical extent.
+enum class Justification { start, center, end };
+
 /// Draws children in Dear ImGui's natural flow. Horizontal stacks separate
 /// items with SameLine(); vertical stacks leave ImGui's default spacing.
 class Stack : public Container {
@@ -120,13 +123,35 @@ private:
 class Table final : public Container {
 public:
     explicit Table(std::size_t columns);
-    [[nodiscard]] std::size_t columns() const noexcept { return headers_.size(); }
+    [[nodiscard]] std::size_t columns() const noexcept { return columns_.size(); }
     void setHeader(std::size_t column, std::string_view value);
     [[nodiscard]] std::string_view header(std::size_t column) const;
+    /// Sizes this column to its header and cell contents.
+    void setColumnFit(std::size_t column);
+    /// Requests a positive fixed width in Dear ImGui pixels for this column.
+    void setColumnWidth(std::size_t column, float width);
+    /// Makes this column share remaining width in proportion to a positive weight.
+    void setColumnWeight(std::size_t column, float weight);
+    /// Positions every cell in this column within its available cell rectangle.
+    void setColumnJustify(std::size_t column, Justification horizontal,
+                          Justification vertical);
+    void setVerticalBorders(bool value) noexcept;
+    [[nodiscard]] bool verticalBorders() const noexcept { return vertical_borders_; }
     void draw() override;
 
 private:
-    std::vector<std::string> headers_;
+    enum class ColumnSizing { fit, fixed, stretch };
+    struct Column {
+        std::string header;
+        ColumnSizing sizing = ColumnSizing::stretch;
+        float width_or_weight = 1.0F;
+        Justification horizontal_justification = Justification::start;
+        Justification vertical_justification = Justification::start;
+    };
+    [[nodiscard]] Column& column(std::size_t index);
+    [[nodiscard]] const Column& column(std::size_t index) const;
+    std::vector<Column> columns_;
+    bool vertical_borders_ = true;
 };
 
 /// Draws children in a bordered fixed-size region. Dear ImGui adds scrollbars

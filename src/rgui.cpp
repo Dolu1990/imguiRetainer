@@ -88,34 +88,110 @@ void Window::draw() {
     ImGui::End();
 }
 
-Table::Table(std::size_t columns) : headers_(columns) {
+Table::Table(std::size_t columns) : columns_(columns) {
     if (columns == 0) throw std::invalid_argument("rgui table requires at least one column");
 }
+Table::Column& Table::column(std::size_t index) {
+    if (index >= columns()) throw std::out_of_range("rgui table column is out of range");
+    return columns_[index];
+}
+const Table::Column& Table::column(std::size_t index) const {
+    if (index >= columns()) throw std::out_of_range("rgui table column is out of range");
+    return columns_[index];
+}
 void Table::setHeader(std::size_t column, std::string_view value) {
-    if (column >= columns()) throw std::out_of_range("rgui table column is out of range");
-    headers_[column] = value;
+    this->column(column).header = value;
 }
 std::string_view Table::header(std::size_t column) const {
-    if (column >= columns()) throw std::out_of_range("rgui table column is out of range");
-    return headers_[column];
+    return this->column(column).header;
 }
+void Table::setColumnFit(std::size_t column) {
+    Column& configured = this->column(column);
+    configured.sizing = ColumnSizing::fit;
+    configured.width_or_weight = 0.0F;
+}
+void Table::setColumnWidth(std::size_t column, float width) {
+    if (!std::isfinite(width) || width <= 0.0F) {
+        throw std::invalid_argument("rgui table column width must be a positive finite value");
+    }
+    Column& configured = this->column(column);
+    configured.sizing = ColumnSizing::fixed;
+    configured.width_or_weight = width;
+}
+void Table::setColumnWeight(std::size_t column, float weight) {
+    if (!std::isfinite(weight) || weight <= 0.0F) {
+        throw std::invalid_argument("rgui table column weight must be a positive finite value");
+    }
+    Column& configured = this->column(column);
+    configured.sizing = ColumnSizing::stretch;
+    configured.width_or_weight = weight;
+}
+void Table::setColumnJustify(std::size_t column, Justification horizontal,
+                             Justification vertical) {
+    Column& configured = this->column(column);
+    configured.horizontal_justification = horizontal;
+    configured.vertical_justification = vertical;
+}
+void Table::setVerticalBorders(bool value) noexcept { vertical_borders_ = value; }
+
+namespace {
+float justification_offset(Justification justification, float available, float content) {
+    const float remaining = std::max(0.0F, available - content);
+    switch (justification) {
+    case Justification::start: return 0.0F;
+    case Justification::center: return remaining * 0.5F;
+    case Justification::end: return remaining;
+    }
+    return 0.0F;
+}
+} // namespace
+
 void Table::draw() {
+    ImGuiTableFlags flags = ImGuiTableFlags_BordersH | ImGuiTableFlags_RowBg |
+                            ImGuiTableFlags_SizingStretchSame;
+    if (vertical_borders_) flags |= ImGuiTableFlags_BordersV;
     const std::string table_id = "##rgui-table-" + std::to_string(id());
-    if (!ImGui::BeginTable(table_id.c_str(), static_cast<int>(columns()),
-                           ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-                               ImGuiTableFlags_SizingStretchSame)) {
+    if (!ImGui::BeginTable(table_id.c_str(), static_cast<int>(columns()), flags)) {
         return;
     }
     bool has_headers = false;
-    for (const std::string& value : headers_) {
-        ImGui::TableSetupColumn(value.empty() ? nullptr : value.c_str());
-        has_headers = has_headers || !value.empty();
+    for (const Column& configured : columns_) {
+        const ImGuiTableColumnFlags column_flags = configured.sizing == ColumnSizing::stretch
+                                                       ? ImGuiTableColumnFlags_WidthStretch
+                                                       : ImGuiTableColumnFlags_WidthFixed;
+        ImGui::TableSetupColumn(configured.header.empty() ? nullptr : configured.header.c_str(),
+                                column_flags, configured.width_or_weight);
+        has_headers = has_headers || !configured.header.empty();
     }
     if (has_headers) ImGui::TableHeadersRow();
+    std::vector<NodePtr> visible_children;
+    visible_children.reserve(children_.size());
     for (const NodePtr& child : children_) {
-        if (!child->visible()) continue;
-        ImGui::TableNextColumn();
-        draw_child(*child);
+        if (child->visible()) visible_children.push_back(child);
+    }
+    for (std::size_t row_start = 0; row_start < visible_children.size(); row_start += columns()) {
+        const std::size_t row_end = std::min(row_start + columns(), visible_children.size());
+        float row_height = 0.0F;
+        for (std::size_t index = row_start; index < row_end; ++index) {
+            row_height = std::max(row_height, visible_children[index]->measure().height);
+        }
+        ImGui::TableNextRow(ImGuiTableRowFlags_None, row_height);
+        for (std::size_t index = row_start; index < row_end; ++index) {
+            const std::size_t column_index = index - row_start;
+            ImGui::TableSetColumnIndex(static_cast<int>(column_index));
+            const Column& configured = columns_[column_index];
+            const Size content_size = visible_children[index]->measure();
+            const ImVec2 cursor = ImGui::GetCursorPos();
+            const ImVec2 available = ImGui::GetContentRegionAvail();
+            const float offset_x = justification_offset(configured.horizontal_justification,
+                                                         available.x, content_size.width);
+            const float offset_y = justification_offset(configured.vertical_justification,
+                                                         row_height, content_size.height);
+            if (offset_x != 0.0F || offset_y != 0.0F) {
+                ImGui::SetCursorPos({cursor.x + offset_x, cursor.y + offset_y});
+            }
+            draw_child(*visible_children[index]);
+        }
     }
     ImGui::EndTable();
 }

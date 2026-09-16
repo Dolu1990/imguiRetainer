@@ -23,6 +23,20 @@ int main() {
         log = rgui.scrollArea(240, 80)
         stats:setHeader(1, "Stat")
         stats:setHeader(2, "Value")
+        stats:setColumnFit(1)
+        stats:setColumnWidth(2, 80)
+        stats:setColumnJustify(2, "right_center")
+        stats:setVerticalBorders(false)
+        alignment_names = {
+            "left", "top", "right",
+            "left_top", "center_top", "right_top",
+            "left_center", "center", "right_center",
+            "left_bottom", "center_bottom", "right_bottom"
+        }
+        alignment_table = rgui.table(1)
+        for _, name in ipairs(alignment_names) do
+            alignment_table:setColumnJustify(1, name)
+        end
         stats:append(rgui.text("Health"))
         stats:append(rgui.text("100"))
         log:append(rgui.text("First log entry"))
@@ -61,7 +75,21 @@ int main() {
         "rgui.Anchor('invalid', 'top_left')", sol::script_pass_on_error);
     const sol::protected_function_result invalid_anchor_fraction = lua.safe_script(
         "rgui.Anchor(-0.1, 0, 0, 0)", sol::script_pass_on_error);
-    if (invalid_anchor_name.valid() || invalid_anchor_fraction.valid()) return 1;
+    const sol::protected_function_result invalid_table_sizing = lua.safe_script(R"(
+        stats:setColumnWeight(0, 1)
+    )", sol::script_pass_on_error);
+    const sol::protected_function_result invalid_table_width = lua.safe_script(R"(
+        stats:setColumnWidth(1, 0)
+    )", sol::script_pass_on_error);
+    const sol::protected_function_result invalid_table_justification = lua.safe_script(R"(
+        stats:setColumnJustify(0, "left_bottom")
+    )", sol::script_pass_on_error);
+    const sol::protected_function_result invalid_justification_name = lua.safe_script(R"(
+        stats:setColumnJustify(1, "diagonal")
+    )", sol::script_pass_on_error);
+    if (invalid_anchor_name.valid() || invalid_anchor_fraction.valid() ||
+        invalid_table_sizing.valid() || invalid_table_width.valid() ||
+        invalid_table_justification.valid() || invalid_justification_name.valid()) return 1;
 
     const sol::protected_function_result callback_result = lua.safe_script(R"(
         failing_button = rgui.button("Fails")
@@ -114,7 +142,7 @@ int main() {
                    stretched_second_anchor->target == rgui::AnchorPoint{1.0F, 0.0F} &&
                    stretched_second_anchor->offsetX == -12.0F && stretched_second_anchor->offsetY == 64.0F
                    && stats->columns() == 2 && stats->header(0) == "Stat" && stats->header(1) == "Value"
-                   && stats->children().size() == 2
+                   && stats->children().size() == 2 && !stats->verticalBorders()
                    && log->size().width == 240.0F && log->size().height == 80.0F
                    && all_nodes->children().size() == 7
                    && callback_error_propagated
