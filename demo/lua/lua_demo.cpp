@@ -85,12 +85,12 @@ int main() {
         root:append(action)
         root:append(stats)
         root:append(log)
-        panel:append(panel_text, 0, 0, 0, 0, 0, 0)
-        --panel:append(panel_action, 0.5, 0, 0.5, 0, 0, 46)
+        panel:append(panel_text, rgui.Anchor("top_left", "top_left"))
+        --panel:append(panel_action, rgui.Anchor("top", "top", 0, 46))
         panel:append(
           panel_action,
-          0, 0, 0, 0, 0, 32,
-          1, 0, 1, 0, 0, 32
+          rgui.Anchor("top_left", "top_left", 0, 32),
+          rgui.Anchor("top_right", "top_right", 0, 32)
         )
         root:append(panel)
         tree = rgui.tree()

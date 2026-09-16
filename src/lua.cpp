@@ -4,6 +4,7 @@
 
 #include <sol/sol.hpp>
 
+#include <cmath>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -26,6 +27,41 @@ const char* axis_to_string(Axis value) noexcept {
 Anchor anchor_from_lua(float selfX, float selfY, float targetX, float targetY,
                        float offsetX, float offsetY) {
     return {{selfX, selfY}, {targetX, targetY}, offsetX, offsetY};
+}
+
+AnchorPoint anchor_point_from_lua(const std::string& value) {
+    if (value == "top_left") return {0.0F, 0.0F};
+    if (value == "top") return {0.5F, 0.0F};
+    if (value == "top_right") return {1.0F, 0.0F};
+    if (value == "left") return {0.0F, 0.5F};
+    if (value == "center") return {0.5F, 0.5F};
+    if (value == "right") return {1.0F, 0.5F};
+    if (value == "bottom_left") return {0.0F, 1.0F};
+    if (value == "bottom") return {0.5F, 1.0F};
+    if (value == "bottom_right") return {1.0F, 1.0F};
+    throw std::invalid_argument(
+        "anchor point must be top_left, top, top_right, left, center, right, "
+        "bottom_left, bottom, or bottom_right");
+}
+
+void validate_anchor_fraction(float value) {
+    if (!std::isfinite(value) || value < 0.0F || value > 1.0F) {
+        throw std::invalid_argument("anchor fractions must be finite values from 0 to 1");
+    }
+}
+
+Anchor anchor_from_lua(const std::string& self, const std::string& target,
+                       float offsetX = 0.0F, float offsetY = 0.0F) {
+    return {anchor_point_from_lua(self), anchor_point_from_lua(target), offsetX, offsetY};
+}
+
+Anchor checked_anchor_from_lua(float selfX, float selfY, float targetX, float targetY,
+                               float offsetX = 0.0F, float offsetY = 0.0F) {
+    validate_anchor_fraction(selfX);
+    validate_anchor_fraction(selfY);
+    validate_anchor_fraction(targetX);
+    validate_anchor_fraction(targetY);
+    return anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY);
 }
 
 std::pair<float, PanelExtent> panel_extent_from_lua(const sol::object& value) {
@@ -58,6 +94,35 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
         std::lock_guard guard(mutex);
         return std::forward<decltype(body)>(body)();
     };
+
+    api.new_usertype<Anchor>("Anchor",
+        sol::call_constructor, sol::factories(
+            [](const std::string& self, const std::string& target) {
+                return anchor_from_lua(self, target);
+            },
+            [](const std::string& self, const std::string& target, float offsetX, float offsetY) {
+                return anchor_from_lua(self, target, offsetX, offsetY);
+            },
+            [](float selfX, float selfY, float targetX, float targetY) {
+                return checked_anchor_from_lua(selfX, selfY, targetX, targetY);
+            },
+            [](float selfX, float selfY, float targetX, float targetY, float offsetX, float offsetY) {
+                return checked_anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY);
+            }),
+        "selfX", sol::property(
+            [](const Anchor& anchor) { return anchor.self.x; },
+            [](Anchor& anchor, float value) { validate_anchor_fraction(value); anchor.self.x = value; }),
+        "selfY", sol::property(
+            [](const Anchor& anchor) { return anchor.self.y; },
+            [](Anchor& anchor, float value) { validate_anchor_fraction(value); anchor.self.y = value; }),
+        "targetX", sol::property(
+            [](const Anchor& anchor) { return anchor.target.x; },
+            [](Anchor& anchor, float value) { validate_anchor_fraction(value); anchor.target.x = value; }),
+        "targetY", sol::property(
+            [](const Anchor& anchor) { return anchor.target.y; },
+            [](Anchor& anchor, float value) { validate_anchor_fraction(value); anchor.target.y = value; }),
+        "offsetX", &Anchor::offsetX,
+        "offsetY", &Anchor::offsetY);
 
     state.new_usertype<Node>("rgui.Node", sol::no_constructor,
         "id", [locked](const Node& node) { return locked([&] { return node.id(); }); },
@@ -111,6 +176,12 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
             [locked](AnchoredPanel& panel, Node& child) {
                 locked([&] { panel.append(child.shared_from_this()); });
             },
+            [locked](AnchoredPanel& panel, Node& child, Anchor anchor) {
+                locked([&] { panel.append(child.shared_from_this(), anchor); });
+            },
+            [locked](AnchoredPanel& panel, Node& child, Anchor primary, Anchor secondary) {
+                locked([&] { panel.append(child.shared_from_this(), primary, secondary); });
+            },
             [locked](AnchoredPanel& panel, Node& child, float selfX, float selfY,
                float targetX, float targetY, float offsetX, float offsetY) {
                 locked([&] {
@@ -130,20 +201,22 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
                                                  secondaryOffsetX, secondaryOffsetY));
                 });
             }),
-        "setAnchor", [locked](AnchoredPanel& panel, Node& child, float selfX, float selfY,
-                           float targetX, float targetY, float offsetX, float offsetY) {
-            locked([&] {
-                panel.setAnchor(child,
-                                anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY));
-            });
-        },
-        "setSecondAnchor", [locked](AnchoredPanel& panel, Node& child, float selfX, float selfY,
-                                  float targetX, float targetY, float offsetX, float offsetY) {
-            locked([&] {
-                panel.setSecondAnchor(child,
-                                      anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY));
-            });
-        },
+        "setAnchor", sol::overload(
+            [locked](AnchoredPanel& panel, Node& child, Anchor anchor) {
+                locked([&] { panel.setAnchor(child, anchor); });
+            },
+            [locked](AnchoredPanel& panel, Node& child, float selfX, float selfY,
+                     float targetX, float targetY, float offsetX, float offsetY) {
+                locked([&] { panel.setAnchor(child, anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY)); });
+            }),
+        "setSecondAnchor", sol::overload(
+            [locked](AnchoredPanel& panel, Node& child, Anchor anchor) {
+                locked([&] { panel.setSecondAnchor(child, anchor); });
+            },
+            [locked](AnchoredPanel& panel, Node& child, float selfX, float selfY,
+                     float targetX, float targetY, float offsetX, float offsetY) {
+                locked([&] { panel.setSecondAnchor(child, anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY)); });
+            }),
         "clearSecondAnchor", [locked](AnchoredPanel& panel, Node& child) {
             locked([&] { panel.setSecondAnchor(child, std::nullopt); });
         });

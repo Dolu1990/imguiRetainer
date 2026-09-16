@@ -35,17 +35,22 @@ panel->append(std::make_shared<rgui::Button>("Continue"),
     {{1.0F, 0.0F}, {1.0F, 0.0F}, -12.0F, 32.0F});
 ```
 
-The optional Lua binding takes self x/y then target x/y fractions (followed by
-pixel offsets):
+The optional Lua binding exposes `rgui.Anchor` values. Named compass points
+use snake case, and arbitrary normalized points remain available:
 
 ```lua
 local panel = rgui.anchoredPanel(320, 100)
-panel:append(rgui.text("Status"), 0, 0, 0, 0, 12, 12)
-panel:append(rgui.button("Continue"), 0.5, 0, 0.5, 0, 0, 32)
+panel:append(rgui.text("Status"), rgui.Anchor("top_left", "top_left", 12, 12))
+panel:append(rgui.button("Continue"), rgui.Anchor(0.5, 0, 0.5, 0, 0, 32))
+panel:append(rgui.button("Stretch"),
+    rgui.Anchor("top_left", "top_left", 12, 64),
+    rgui.Anchor("top_right", "top_right", -12, 64))
 ```
 
-Lua accepts the same two-anchor form, or `setSecondAnchor`, using another
-`self`, `target`, and offset pair after the primary anchor arguments.
+Anchor coordinates can be adjusted through `selfX`, `selfY`, `targetX`,
+`targetY`, `offsetX`, and `offsetY`. `append`, `setAnchor`, and
+`setSecondAnchor` accept Anchor values directly. The earlier positional float
+forms remain supported for compatibility.
 
 Either Lua dimension can instead be `"fill"`, which resolves each frame to the
 available content width or height of its containing ImGui window. It therefore
