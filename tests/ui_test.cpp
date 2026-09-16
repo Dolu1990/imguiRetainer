@@ -257,6 +257,21 @@ int main() {
     table->append(std::make_shared<rgui::Text>("100"));
     root->append(table);
     expect(table->columns() == 2 && table->header(0) == "Name" && table->children().size() == 2);
+    const rgui::Color red{1.0F, 0.0F, 0.0F, 1.0F};
+    expect(red.red() == 1.0F && red.green() == 0.0F && red.blue() == 0.0F && red.alpha() == 1.0F);
+    bool rejected_color = true;
+    for (const float invalid : {-0.1F, 1.1F, std::numeric_limits<float>::infinity(),
+                                std::numeric_limits<float>::quiet_NaN()}) {
+        bool component_rejected = false;
+        try { static_cast<void>(rgui::Color(invalid, 0.0F, 0.0F, 1.0F)); }
+        catch (const std::invalid_argument&) { component_rejected = true; }
+        rejected_color = rejected_color && component_rejected;
+    }
+    expect(rejected_color);
+    table->setRowColor(3, red);
+    expect(table->rowColor(3) && *table->rowColor(3) == red && !table->rowColor(2));
+    table->clearRowColor(3);
+    expect(!table->rowColor(3));
     expect(table->innerHorizontalBorders() && table->outerHorizontalBorders() &&
            table->innerVerticalBorders() && table->outerVerticalBorders());
     table->setInnerHorizontalBorders(false);
@@ -331,6 +346,16 @@ int main() {
     auto default_second_width = std::make_shared<TableWidthRecordingNode>();
     default_table->append(default_first_width);
     default_table->append(default_second_width);
+
+    auto logical_rows = std::make_shared<rgui::Table>(2);
+    auto hidden_slot = std::make_shared<TablePositionRecordingNode>(rgui::Size{20.0F, 10.0F});
+    auto first_visible_slot = std::make_shared<TablePositionRecordingNode>(rgui::Size{20.0F, 10.0F});
+    auto next_row_first_slot = std::make_shared<TablePositionRecordingNode>(rgui::Size{20.0F, 10.0F});
+    hidden_slot->setVisible(false);
+    logical_rows->append(hidden_slot);
+    logical_rows->append(first_visible_slot);
+    logical_rows->append(next_row_first_slot);
+    logical_rows->setRowColor(1, rgui::Color{0.0F, 1.0F, 0.0F, 1.0F});
 
     auto scrollArea = std::make_shared<rgui::ScrollArea>(rgui::Size{160.0F, 40.0F});
     auto scroll_contents = std::make_shared<ScrollRecordingNode>();
@@ -411,6 +436,12 @@ int main() {
     ImGui::End();
     expect(default_first_width->width() >= default_second_width->width() - 1.0F &&
            default_first_width->width() <= default_second_width->width() + 1.0F);
+    ImGui::SetNextWindowSize({400.0F, 200.0F}, ImGuiCond_Always);
+    ImGui::Begin("logical table rows test");
+    logical_rows->draw();
+    ImGui::End();
+    expect(first_visible_slot->position().x > next_row_first_slot->position().x + 1.0F &&
+           next_row_first_slot->position().y > first_visible_slot->position().y + 1.0F);
     ImGui::SetNextWindowSize({400.0F, 200.0F}, ImGuiCond_Always);
     ImGui::Begin("justified table test");
     justified_table->draw();

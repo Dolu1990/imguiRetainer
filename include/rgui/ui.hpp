@@ -26,6 +26,23 @@ struct SizeProposal {
     std::optional<float> height;
 };
 
+/// An RGBA color whose components are finite values from zero to one.
+class Color {
+public:
+    Color(float red, float green, float blue, float alpha);
+    [[nodiscard]] float red() const noexcept { return red_; }
+    [[nodiscard]] float green() const noexcept { return green_; }
+    [[nodiscard]] float blue() const noexcept { return blue_; }
+    [[nodiscard]] float alpha() const noexcept { return alpha_; }
+    constexpr bool operator==(const Color&) const = default;
+
+private:
+    float red_;
+    float green_;
+    float blue_;
+    float alpha_;
+};
+
 class Container;
 class Button;
 class Node;
@@ -109,8 +126,9 @@ private:
 };
 
 /// Draws children as cells in a Dear ImGui table, in row-major order. A new
-/// row is started automatically after every `columns()` visible children.
-/// Headers are optional and use zero-based column indices in C++.
+/// row is started automatically after every `columns()` child slots. Hidden
+/// children leave their slot empty. Headers and rows use zero-based indices in
+/// C++.
 class Table final : public Container {
 public:
     explicit Table(std::size_t columns);
@@ -126,6 +144,12 @@ public:
     /// Positions every cell in this column within its available cell rectangle.
     void setColumnJustify(std::size_t column, Justification horizontal,
                           Justification vertical);
+    /// Overrides the background color of a logical row. Rows may be configured
+    /// before they have any child slots.
+    void setRowColor(std::size_t row, Color color);
+    /// Removes a row background override and restores Dear ImGui's default.
+    void clearRowColor(std::size_t row) noexcept;
+    [[nodiscard]] std::optional<Color> rowColor(std::size_t row) const noexcept;
     void setInnerHorizontalBorders(bool value) noexcept;
     [[nodiscard]] bool innerHorizontalBorders() const noexcept { return inner_horizontal_borders_; }
     void setOuterHorizontalBorders(bool value) noexcept;
@@ -150,6 +174,7 @@ private:
     [[nodiscard]] Column& column(std::size_t index);
     [[nodiscard]] const Column& column(std::size_t index) const;
     std::vector<Column> columns_;
+    std::vector<std::optional<Color>> row_colors_;
     bool inner_horizontal_borders_ = true;
     bool outer_horizontal_borders_ = true;
     bool inner_vertical_borders_ = true;

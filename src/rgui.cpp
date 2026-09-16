@@ -21,6 +21,7 @@ std::optional<float> proposed_axis(float primary_target, float secondary_target,
                                    float primary_self, float secondary_self);
 void validate_size(Size size);
 void validate_font_scale(float scale);
+void validate_color_component(float value);
 
 class ScopedFontScale final {
 public:
@@ -40,6 +41,14 @@ Size Node::measure() const { return {}; }
 Size Node::measure(const SizeProposal&) const { return measure(); }
 void Node::draw(Size) { draw(); }
 void Node::set_tree_recursive(UiTree* tree) noexcept { if (tree_ != tree) { tree_ = tree; ++attachment_generation_; } }
+
+Color::Color(float red, float green, float blue, float alpha)
+    : red_(red), green_(green), blue_(blue), alpha_(alpha) {
+    validate_color_component(red);
+    validate_color_component(green);
+    validate_color_component(blue);
+    validate_color_component(alpha);
+}
 
 Container::~Container() { for (const NodePtr& child : children_) child->parent_ = nullptr; }
 void Container::set_tree_recursive(UiTree* tree) noexcept {
@@ -194,6 +203,16 @@ void Table::setColumnJustify(std::size_t column, Justification horizontal,
     configured.horizontal_justification = horizontal;
     configured.vertical_justification = vertical;
 }
+void Table::setRowColor(std::size_t row, Color color) {
+    if (row >= row_colors_.size()) row_colors_.resize(row + 1);
+    row_colors_[row] = color;
+}
+void Table::clearRowColor(std::size_t row) noexcept {
+    if (row < row_colors_.size()) row_colors_[row].reset();
+}
+std::optional<Color> Table::rowColor(std::size_t row) const noexcept {
+    return row < row_colors_.size() ? row_colors_[row] : std::nullopt;
+}
 void Table::setInnerHorizontalBorders(bool value) noexcept { inner_horizontal_borders_ = value; }
 void Table::setOuterHorizontalBorders(bool value) noexcept { outer_horizontal_borders_ = value; }
 void Table::setInnerVerticalBorders(bool value) noexcept { inner_vertical_borders_ = value; }
@@ -239,23 +258,29 @@ void Table::draw() {
         has_headers = has_headers || !configured.header.empty();
     }
     if (has_headers) ImGui::TableHeadersRow();
-    std::vector<NodePtr> visible_children;
-    visible_children.reserve(children_.size());
-    for (const NodePtr& child : children_) {
-        if (child->visible()) visible_children.push_back(child);
-    }
-    for (std::size_t row_start = 0; row_start < visible_children.size(); row_start += columns()) {
-        const std::size_t row_end = std::min(row_start + columns(), visible_children.size());
+    for (std::size_t row_start = 0; row_start < children_.size(); row_start += columns()) {
+        const std::size_t row_end = std::min(row_start + columns(), children_.size());
+        bool has_visible_child = false;
         float row_height = 0.0F;
         for (std::size_t index = row_start; index < row_end; ++index) {
-            row_height = std::max(row_height, visible_children[index]->measure().height);
+            if (!children_[index]->visible()) continue;
+            has_visible_child = true;
+            row_height = std::max(row_height, children_[index]->measure().height);
         }
+        if (!has_visible_child) continue;
         ImGui::TableNextRow(ImGuiTableRowFlags_None, row_height);
+        const std::size_t row = row_start / columns();
+        if (const std::optional<Color> color = rowColor(row)) {
+            const ImU32 packed = ImGui::ColorConvertFloat4ToU32(
+                {color->red(), color->green(), color->blue(), color->alpha()});
+            ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, packed);
+        }
         for (std::size_t index = row_start; index < row_end; ++index) {
+            if (!children_[index]->visible()) continue;
             const std::size_t column_index = index - row_start;
             ImGui::TableSetColumnIndex(static_cast<int>(column_index));
             const Column& configured = columns_[column_index];
-            const Size content_size = visible_children[index]->measure();
+            const Size content_size = children_[index]->measure();
             const ImVec2 cursor = ImGui::GetCursorPos();
             const ImVec2 available = ImGui::GetContentRegionAvail();
             const float offset_x = justification_offset(configured.horizontal_justification,
@@ -265,7 +290,7 @@ void Table::draw() {
             if (offset_x != 0.0F || offset_y != 0.0F) {
                 ImGui::SetCursorPos({cursor.x + offset_x, cursor.y + offset_y});
             }
-            draw_child(*visible_children[index]);
+            draw_child(*children_[index]);
         }
     }
     ImGui::EndTable();
@@ -294,6 +319,11 @@ namespace {
 void validate_font_scale(float scale) {
     if (!std::isfinite(scale) || scale <= 0.0F) {
         throw std::invalid_argument("rgui font scale must be finite and greater than zero");
+    }
+}
+void validate_color_component(float value) {
+    if (!std::isfinite(value) || value < 0.0F || value > 1.0F) {
+        throw std::invalid_argument("rgui color components must be finite values from 0 to 1");
     }
 }
 

@@ -159,6 +159,15 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
             [](Anchor& anchor, float value) { validate_anchor_fraction(value); anchor.target.y = value; }),
         "offsetX", &Anchor::offsetX,
         "offsetY", &Anchor::offsetY);
+    api.new_usertype<Color>("Color",
+        sol::call_constructor,
+        sol::factories([](float red, float green, float blue, float alpha) {
+            return Color{red, green, blue, alpha};
+        }),
+        "red", sol::property(&Color::red),
+        "green", sol::property(&Color::green),
+        "blue", sol::property(&Color::blue),
+        "alpha", sol::property(&Color::alpha));
 
     state.new_usertype<Node>("rgui.Node", sol::no_constructor,
         "id", [locked](const Node& node) { return locked([&] { return node.id(); }); },
@@ -245,6 +254,18 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
                 if (column == 0) throw std::invalid_argument("table column indices start at 1");
                 const auto [horizontal, vertical] = table_justification_from_string(value);
                 table.setColumnJustify(column - 1, horizontal, vertical);
+            });
+        },
+        "setRowColor", [locked](Table& table, std::size_t row, Color color) {
+            locked([&] {
+                if (row == 0) throw std::invalid_argument("table row indices start at 1");
+                table.setRowColor(row - 1, color);
+            });
+        },
+        "clearRowColor", [locked](Table& table, std::size_t row) {
+            locked([&] {
+                if (row == 0) throw std::invalid_argument("table row indices start at 1");
+                table.clearRowColor(row - 1);
             });
         },
         "setInnerHorizontalBorders", [locked](Table& table, bool value) {

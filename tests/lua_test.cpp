@@ -30,6 +30,9 @@ int main() {
         stats:setColumnFit(1)
         stats:setColumnWidth(2, 80)
         stats:setColumnJustify(2, "right_center")
+        row_color = rgui.Color(1.0, 0.0, 0.0, 1.0)
+        stats:setRowColor(2, row_color)
+        stats:clearRowColor(2)
         stats:setInnerHorizontalBorders(false)
         stats:setOuterHorizontalBorders(false)
         stats:setHorizontalBorders(true)
@@ -113,6 +116,11 @@ int main() {
     const sol::protected_function_result invalid_table_justification = lua.safe_script(R"(
         stats:setColumnJustify(0, "left_bottom")
     )", sol::script_pass_on_error);
+    const sol::protected_function_result invalid_table_row = lua.safe_script(R"(
+        stats:setRowColor(0, rgui.Color(1, 0, 0, 1))
+    )", sol::script_pass_on_error);
+    const sol::protected_function_result invalid_color = lua.safe_script(
+        "rgui.Color(1.1, 0, 0, 1)", sol::script_pass_on_error);
     const sol::protected_function_result invalid_justification_name = lua.safe_script(R"(
         stats:setColumnJustify(1, "diagonal")
     )", sol::script_pass_on_error);
@@ -129,6 +137,7 @@ int main() {
     if (invalid_anchor_name.valid() || invalid_anchor_fraction.valid() ||
         invalid_table_sizing.valid() || invalid_table_width.valid() ||
         invalid_table_justification.valid() || invalid_justification_name.valid() ||
+        invalid_table_row.valid() || invalid_color.valid() ||
         invalid_window_alpha.valid() || invalid_window_extent.valid() ||
         invalid_text_font_scale.valid() || invalid_button_font_scale.valid()) return 1;
 
@@ -149,6 +158,7 @@ int main() {
     const std::shared_ptr<rgui::Button> stretched = lua["stretched"];
     const rgui::Anchor numeric_anchor = lua["numeric_anchor"];
     const std::shared_ptr<rgui::Table> stats = lua["stats"];
+    const rgui::Color row_color = lua["row_color"];
     const std::shared_ptr<rgui::ScrollArea> log = lua["log"];
     const std::shared_ptr<rgui::Stack> all_nodes = lua["all_nodes"];
     const rgui::Anchor anchor = panel->anchor(*action);
@@ -196,6 +206,7 @@ int main() {
                    stretched_second_anchor->offsetX == -12.0F && stretched_second_anchor->offsetY == 64.0F
                    && stats->columns() == 2 && stats->header(0) == "Stat" && stats->header(1) == "Value"
                    && stats->children().size() == 2 && lua["lua_border_state"].get<bool>()
+                   && row_color == rgui::Color{1.0F, 0.0F, 0.0F, 1.0F} && !stats->rowColor(1)
                    && stats->innerHorizontalBorders() && stats->outerHorizontalBorders()
                    && !stats->innerVerticalBorders() && !stats->outerVerticalBorders()
                    && log->size().width == 240.0F && log->size().height == 80.0F
