@@ -70,7 +70,7 @@ int main() {
     const auto update_status = [&] {
         status->setValue("Button clicks: " + std::to_string(clicks));
     };
-    increment->setOnClick([&](rgui::Button&) {
+    increment->setOnClick([&](rgui::Node&) {
         ++clicks;
         update_status();
     });
@@ -79,12 +79,12 @@ int main() {
     auto generated_labels = std::make_shared<rgui::Stack>();
     std::mt19937 random_engine{std::random_device{}()};
     std::uniform_int_distribution<int> random_number{0, 9999};
-    add_random_label->setOnClick([&](rgui::Button&) {
+    add_random_label->setOnClick([&](rgui::Node&) {
         auto label = std::make_shared<rgui::Text>(
             "Random number: " + std::to_string(random_number(random_engine)));
         generated_labels->append(std::move(label));
     });
-    reset->setOnClick([&](rgui::Button&) {
+    reset->setOnClick([&](rgui::Node&) {
         clicks = 0;
         generated_labels->clear();
         update_status();

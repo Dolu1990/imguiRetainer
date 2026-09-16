@@ -96,7 +96,7 @@ int main() {
     expect(first->parent() == root.get());
 
     bool activated = false;
-    first->setOnClick([&activated](rgui::Button&) { activated = true; });
+    first->setOnClick([&activated](rgui::Node&) { activated = true; });
     first->activate();
     expect(!activated);
     expect(tree.flushEvents() == 1);
@@ -108,23 +108,57 @@ int main() {
 
     bool snapshot_callback = false;
     first->setEnabled(true);
-    first->setOnClick([&snapshot_callback](rgui::Button&) { snapshot_callback = true; });
+    first->setOnClick([&snapshot_callback](rgui::Node&) { snapshot_callback = true; });
     first->activate();
-    first->setOnClick([](rgui::Button&) {});
+    first->setOnClick([](rgui::Node&) {});
     first->setLabel("changed while queued");
     expect(tree.flushEvents() == 1);
     expect(snapshot_callback);
 
+    auto clickable_text = std::make_shared<rgui::Text>("clickable");
+    root->append(clickable_text);
+    rgui::Node* clicked_text_target = nullptr;
+    clickable_text->setOnClick([&clicked_text_target](rgui::Node& node) {
+        clicked_text_target = &node;
+    });
+    clickable_text->activate();
+    expect(clicked_text_target == nullptr);
+    expect(tree.flushEvents() == 1);
+    expect(clicked_text_target == clickable_text.get());
+    clicked_text_target = nullptr;
+    clickable_text->setEnabled(false);
+    clickable_text->activate();
+    expect(tree.flushEvents() == 0);
+    clickable_text->setEnabled(true);
+
+    bool text_snapshot_callback = false;
+    clickable_text->setOnClick([&text_snapshot_callback](rgui::Node&) {
+        text_snapshot_callback = true;
+    });
+    clickable_text->activate();
+    clickable_text->setOnClick([](rgui::Node&) {});
+    expect(tree.flushEvents() == 1);
+    expect(text_snapshot_callback);
+
+    bool detached_text_called = false;
+    clickable_text->setOnClick([&detached_text_called](rgui::Node&) {
+        detached_text_called = true;
+    });
+    clickable_text->activate();
+    const rgui::NodePtr removed_text = root->remove(*clickable_text);
+    expect(tree.flushEvents() == 0);
+    expect(!detached_text_called);
+
     auto self_removing = std::make_shared<rgui::Button>("remove me");
     root->append(self_removing);
-    self_removing->setOnClick([&root](rgui::Button& button) { (void)root->remove(button); });
+    self_removing->setOnClick([&root](rgui::Node& button) { (void)root->remove(button); });
     self_removing->activate();
     expect(tree.flushEvents() == 1);
     expect(self_removing->parent() == nullptr);
 
     auto discarded = std::make_shared<rgui::Button>("discarded");
     bool discarded_called = false;
-    discarded->setOnClick([&discarded_called](rgui::Button&) { discarded_called = true; });
+    discarded->setOnClick([&discarded_called](rgui::Node&) { discarded_called = true; });
     root->append(discarded);
     discarded->activate();
     const rgui::NodePtr removed_discarded = root->remove(*discarded);
@@ -132,9 +166,9 @@ int main() {
     expect(!discarded_called);
 
     int deferred_dispatches = 0;
-    first->setOnClick([&deferred_dispatches](rgui::Button& button) {
+    first->setOnClick([&deferred_dispatches](rgui::Node& node) {
         ++deferred_dispatches;
-        if (deferred_dispatches == 1) button.activate();
+        if (deferred_dispatches == 1) static_cast<rgui::Button&>(node).activate();
     });
     first->activate();
     expect(tree.flushEvents() == 1);
@@ -154,7 +188,7 @@ int main() {
     auto moved_root = std::make_shared<rgui::Window>("moved");
     auto moved_button = std::make_shared<rgui::Button>("moved button");
     bool moved_callback = false;
-    moved_button->setOnClick([&moved_callback](rgui::Button&) { moved_callback = true; });
+    moved_button->setOnClick([&moved_callback](rgui::Node&) { moved_callback = true; });
     moved_root->append(moved_button);
     rgui::UiTree original_tree;
     original_tree.setRoot(moved_root);

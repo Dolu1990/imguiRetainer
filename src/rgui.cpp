@@ -336,14 +336,19 @@ void AnchoredPanel::draw() {
 
 Text::Text(std::string value) : value_(std::move(value)) {}
 void Text::setValue(std::string_view value) { value_ = value; }
+void Text::setOnClick(std::function<void(Node&)> callback) { on_click_ = std::move(callback); }
+void Text::activate() { if (visible() && enabled() && on_click_ && tree_) tree_->enqueue_event(weak_from_this(), attachment_generation_, on_click_); }
 Size Text::measure() const {
     const ImVec2 size = ImGui::CalcTextSize(value_.data(), value_.data() + value_.size());
     return {size.x, size.y};
 }
-void Text::draw() { ImGui::TextUnformatted(value_.data(), value_.data() + value_.size()); }
+void Text::draw() {
+    ImGui::TextUnformatted(value_.data(), value_.data() + value_.size());
+    if (enabled() && ImGui::IsItemClicked(ImGuiMouseButton_Left)) activate();
+}
 Button::Button(std::string label) : label_(std::move(label)) {}
 void Button::setLabel(std::string_view value) { label_ = value; }
-void Button::setOnClick(std::function<void(Button&)> callback) { on_click_ = std::move(callback); }
+void Button::setOnClick(std::function<void(Node&)> callback) { on_click_ = std::move(callback); }
 void Button::activate() { if (visible() && enabled() && on_click_ && tree_) tree_->enqueue_event(weak_from_this(), attachment_generation_, on_click_); }
 Size Button::measure() const {
     const ImVec2 text_size = ImGui::CalcTextSize(label_.c_str(), nullptr, true);
@@ -405,15 +410,13 @@ void UiTree::draw() {
     const std::string id = std::to_string(root_->id());
     ImGui::PushID(id.c_str()); root_->draw(); ImGui::PopID();
 }
-void UiTree::enqueue_event(const std::weak_ptr<Node>& target, std::uint64_t attachment_generation, std::function<void(Button&)> callback) { events_.push_back({target, attachment_generation, std::move(callback)}); }
+void UiTree::enqueue_event(const std::weak_ptr<Node>& target, std::uint64_t attachment_generation, std::function<void(Node&)> callback) { events_.push_back({target, attachment_generation, std::move(callback)}); }
 std::size_t UiTree::flushEvents() {
     std::vector<Event> events = std::move(events_); events_.clear(); std::size_t invoked = 0;
     for (Event& event : events) {
         const std::shared_ptr<Node> target = event.target.lock();
         if (!target || target->tree_ != this || target->attachment_generation_ != event.attachment_generation) continue;
-        const std::shared_ptr<Button> button = std::dynamic_pointer_cast<Button>(target);
-        if (!button) continue;
-        event.callback(*button); ++invoked;
+        event.callback(*target); ++invoked;
     }
     return invoked;
 }

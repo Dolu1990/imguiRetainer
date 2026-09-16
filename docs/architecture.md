@@ -60,7 +60,7 @@ columns, optional headers, and draws visible children as row-major cells.
 Each column can justify its cell content horizontally and vertically with
 start, center, or end alignment; the default is start on both axes.
 
-Button callbacks are queued and must be delivered by `UiTree::flushEvents()`
+Button and text click callbacks are queued and must be delivered by `UiTree::flushEvents()`
 at an application-selected safe point. A queued callback is discarded when its
 target is detached, reattached to another tree, or destroyed before dispatch.
 Callback errors, including Lua errors, propagate from `flushEvents()` to the

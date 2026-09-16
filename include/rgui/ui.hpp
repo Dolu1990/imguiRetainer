@@ -61,6 +61,7 @@ public:
 private:
     friend class Container;
     friend class Button;
+    friend class Text;
     friend class UiTree;
     virtual void set_tree_recursive(UiTree* tree) noexcept;
     NodeId id_;
@@ -236,10 +237,13 @@ public:
     explicit Text(std::string value = {});
     [[nodiscard]] std::string_view value() const noexcept { return value_; }
     void setValue(std::string_view value);
+    void setOnClick(std::function<void(Node&)> callback);
+    void activate();
     [[nodiscard]] Size measure() const override;
     void draw() override;
 private:
     std::string value_;
+    std::function<void(Node&)> on_click_;
 };
 
 class Button final : public Node {
@@ -247,7 +251,7 @@ public:
     explicit Button(std::string label = {});
     [[nodiscard]] std::string_view label() const noexcept { return label_; }
     void setLabel(std::string_view value);
-    void setOnClick(std::function<void(Button&)> callback);
+    void setOnClick(std::function<void(Node&)> callback);
     void activate();
     [[nodiscard]] Size measure() const override;
     [[nodiscard]] Size measure(const SizeProposal& proposal) const override;
@@ -255,7 +259,7 @@ public:
     void draw(Size resolved_size) override;
 private:
     std::string label_;
-    std::function<void(Button&)> on_click_;
+    std::function<void(Node&)> on_click_;
 };
 
 /// Owns one root and draws it into the caller-owned current Dear ImGui frame.
@@ -275,14 +279,15 @@ public:
     [[nodiscard]] std::size_t pendingEventCount() const noexcept { return events_.size(); }
 private:
     friend class Button;
+    friend class Text;
     struct Event {
         std::weak_ptr<Node> target;
         std::uint64_t attachment_generation = 0;
-        std::function<void(Button&)> callback;
+        std::function<void(Node&)> callback;
     };
 
     void enqueue_event(const std::weak_ptr<Node>& target, std::uint64_t attachment_generation,
-                       std::function<void(Button&)> callback);
+                       std::function<void(Node&)> callback);
     NodePtr root_;
     std::vector<Event> events_;
 };

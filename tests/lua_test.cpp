@@ -64,6 +64,13 @@ int main() {
         panel:append(stretched,
             rgui.Anchor("top_left", "top_left", 12, 64),
             rgui.Anchor("top_right", "top_right", -12, 64))
+        callback_root = rgui.stack("vertical")
+        clickable_text = rgui.text("Clickable text")
+        clickable_button = rgui.button("Clickable button")
+        clickable_text:onClick(function(node) text_callback_value = node.value end)
+        clickable_button:onClick(function(node) button_callback_label = node.label end)
+        callback_root:append(clickable_text)
+        callback_root:append(clickable_button)
     )", sol::script_pass_on_error);
     if (!result.valid()) {
         const sol::error error = result;
@@ -114,6 +121,16 @@ int main() {
     const rgui::Anchor stretched_anchor = panel->anchor(*stretched);
     const std::optional<rgui::Anchor>& stretched_second_anchor = panel->secondAnchor(*stretched);
     const std::shared_ptr<rgui::Button> failing_button = lua["failing_button"];
+    const std::shared_ptr<rgui::Stack> callback_root = lua["callback_root"];
+    const std::shared_ptr<rgui::Text> clickable_text = lua["clickable_text"];
+    const std::shared_ptr<rgui::Button> clickable_button = lua["clickable_button"];
+    rgui::UiTree click_tree;
+    click_tree.setRoot(callback_root);
+    clickable_text->activate();
+    clickable_button->activate();
+    const bool lua_click_callbacks_work = click_tree.flushEvents() == 2 &&
+        lua["text_callback_value"].get<std::string>() == "Clickable text" &&
+        lua["button_callback_label"].get<std::string>() == "Clickable button";
     rgui::UiTree callback_tree;
     callback_tree.setRoot(failing_button);
     failing_button->activate();
@@ -145,7 +162,7 @@ int main() {
                    && stats->children().size() == 2 && !stats->verticalBorders()
                    && log->size().width == 240.0F && log->size().height == 80.0F
                    && all_nodes->children().size() == 7
-                   && callback_error_propagated
+                   && callback_error_propagated && lua_click_callbacks_work
                ? 0
                : 1;
 }

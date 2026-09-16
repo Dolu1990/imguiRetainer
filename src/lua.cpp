@@ -89,10 +89,20 @@ std::pair<float, PanelExtent> panel_extent_from_lua(const sol::object& value) {
     throw std::invalid_argument("panel extent must be a number or the string 'fill'");
 }
 
-struct LuaButtonCallback {
+struct LuaNodeCallback {
     sol::function function;
     std::function<void(sol::function&, std::vector<sol::object>&)> execute;
 };
+
+sol::object node_to_lua(sol::function& callback, Node& node) {
+    if (auto* text = dynamic_cast<Text*>(&node)) {
+        return sol::make_object(callback.lua_state(), std::ref(*text));
+    }
+    if (auto* button = dynamic_cast<Button*>(&node)) {
+        return sol::make_object(callback.lua_state(), std::ref(*button));
+    }
+    return sol::make_object(callback.lua_state(), std::ref(node));
+}
 
 } // namespace
 
@@ -271,18 +281,29 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
         sol::base_classes, sol::bases<Node>(),
         "value", sol::property(
             [locked](const Text& text) { return locked([&] { return std::string(text.value()); }); },
-            [locked](Text& text, const std::string& value) { locked([&] { text.setValue(value); }); }));
+            [locked](Text& text, const std::string& value) { locked([&] { text.setValue(value); }); }),
+        "onClick", [locked, callbackExecute](Text& text, sol::function callback) {
+            auto luaCallback = std::make_shared<LuaNodeCallback>(
+                LuaNodeCallback{std::move(callback), callbackExecute});
+            locked([&] {
+                text.setOnClick([luaCallback](Node& node) {
+                    std::vector<sol::object> args{node_to_lua(luaCallback->function, node)};
+                    luaCallback->execute(luaCallback->function, args);
+                });
+            });
+        },
+        "activate", [locked](Text& text) { locked([&] { text.activate(); }); });
     state.new_usertype<Button>("rgui.Button", sol::no_constructor,
         sol::base_classes, sol::bases<Node>(),
         "label", sol::property(
             [locked](const Button& button) { return locked([&] { return std::string(button.label()); }); },
             [locked](Button& button, const std::string& value) { locked([&] { button.setLabel(value); }); }),
         "onClick", [locked, callbackExecute](Button& button, sol::function callback) {
-            auto luaCallback = std::make_shared<LuaButtonCallback>(
-                LuaButtonCallback{std::move(callback), callbackExecute});
+            auto luaCallback = std::make_shared<LuaNodeCallback>(
+                LuaNodeCallback{std::move(callback), callbackExecute});
             locked([&] {
-                button.setOnClick([luaCallback](Button&) {
-                    std::vector<sol::object> args;
+                button.setOnClick([luaCallback](Node& node) {
+                    std::vector<sol::object> args{node_to_lua(luaCallback->function, node)};
                     luaCallback->execute(luaCallback->function, args);
                 });
             });
