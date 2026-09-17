@@ -182,6 +182,9 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
         "append", [locked](Container& parent, Node& child) {
             locked([&] { parent.append(child.shared_from_this()); });
         },
+        "replace", [locked](Container& parent, Node& oldChild, Node& newChild) {
+            return locked([&] { return parent.replace(oldChild, newChild.shared_from_this()); });
+        },
         "clear", [locked](Container& container) { locked([&] { container.clear(); }); });
     state.new_usertype<Stack>("rgui.Stack", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>(),

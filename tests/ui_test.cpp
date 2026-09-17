@@ -83,6 +83,23 @@ private:
     ImVec2 position_{};
     float remaining_width_ = 0.0F;
 };
+
+class ReplaceDuringDrawNode final : public rgui::Node {
+public:
+    ReplaceDuringDrawNode(rgui::Container& parent, rgui::NodePtr replacement, bool& rejected)
+        : parent_(parent), replacement_(std::move(replacement)), rejected_(rejected) {}
+    void draw() override {
+        try {
+            (void)parent_.replace(*this, replacement_);
+        } catch (const std::logic_error&) {
+            rejected_ = true;
+        }
+    }
+private:
+    rgui::Container& parent_;
+    rgui::NodePtr replacement_;
+    bool& rejected_;
+};
 } // namespace
 
 int main() {
@@ -110,6 +127,40 @@ int main() {
     rgui::UiTree tree;
     tree.setRoot(root);
     expect(first->parent() == root.get());
+
+    auto replaceable = std::make_shared<rgui::Button>("replaceable");
+    auto replacement = std::make_shared<rgui::Table>(1);
+    bool replaced_callback_called = false;
+    replaceable->setOnClick([&replaced_callback_called](rgui::Node&) { replaced_callback_called = true; });
+    root->append(replaceable);
+    replaceable->activate();
+    const rgui::NodePtr replaced = root->replace(*replaceable, replacement);
+    expect(replaced == replaceable && replaceable->parent() == nullptr && replacement->parent() == root.get() &&
+           root->children().size() == 3 && root->children()[2] == replacement && tree.flushEvents() == 0 &&
+           !replaced_callback_called);
+    bool rejected_null_replacement = false;
+    bool rejected_parented_replacement = false;
+    bool rejected_cycle_replacement = false;
+    try { (void)root->replace(*replacement, nullptr); } catch (const std::invalid_argument&) { rejected_null_replacement = true; }
+    try { (void)root->replace(*replacement, first); } catch (const std::logic_error&) { rejected_parented_replacement = true; }
+    try { (void)root->replace(*replacement, root); } catch (const std::logic_error&) { rejected_cycle_replacement = true; }
+    expect(rejected_null_replacement && rejected_parented_replacement && rejected_cycle_replacement &&
+           root->children()[2] == replacement);
+
+    auto anchored_old = std::make_shared<rgui::Text>("anchored old");
+    auto anchored_new = std::make_shared<rgui::Button>("anchored new");
+    rgui::AnchoredPanel replacement_panel({100.0F, 50.0F});
+    const rgui::Anchor primary{{0.25F, 0.0F}, {0.25F, 0.0F}, 4.0F, 8.0F};
+    const rgui::Anchor secondary{{0.75F, 1.0F}, {0.75F, 1.0F}, -4.0F, -8.0F};
+    replacement_panel.append(anchored_old, primary, secondary);
+    (void)replacement_panel.replace(*anchored_old, anchored_new);
+    const rgui::Anchor replaced_primary = replacement_panel.anchor(*anchored_new);
+    const std::optional<rgui::Anchor>& replaced_secondary = replacement_panel.secondAnchor(*anchored_new);
+    expect(replaced_primary.self == primary.self && replaced_primary.target == primary.target &&
+           replaced_primary.offsetX == primary.offsetX && replaced_primary.offsetY == primary.offsetY &&
+           replaced_secondary && replaced_secondary->self == secondary.self &&
+           replaced_secondary->target == secondary.target && replaced_secondary->offsetX == secondary.offsetX &&
+           replaced_secondary->offsetY == secondary.offsetY);
 
     rgui::Window overlay("overlay");
     expect(overlay.backgroundAlpha() == 1.0F && overlay.decorated() && overlay.movable() && overlay.resizable());
@@ -362,6 +413,9 @@ int main() {
     scrollArea->append(scroll_contents);
     root->append(scrollArea);
     expect(scrollArea->size().width == 160.0F && scrollArea->size().height == 40.0F);
+    bool replacement_during_draw_rejected = false;
+    root->append(std::make_shared<ReplaceDuringDrawNode>(*root, std::make_shared<rgui::Text>("replacement"),
+                                                         replacement_during_draw_rejected));
 
     ImGui::CreateContext();
     ImGui::GetIO().DisplaySize = {640.0F, 480.0F};
@@ -396,6 +450,7 @@ int main() {
     CustomNode custom;
     custom.draw();
     tree.draw();
+    expect(replacement_during_draw_rejected);
     overlay.setScreenLayout({{200.0F, 100.0F}, rgui::PanelExtent::fixed, rgui::PanelExtent::fixed,
                              {{0.5F, 0.5F}, {0.5F, 0.5F}}});
     overlay.draw();

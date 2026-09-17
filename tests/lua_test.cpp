@@ -64,6 +64,12 @@ int main() {
         all_nodes:append(rgui.anchoredPanel(100, 50))
         all_nodes:append(rgui.text("Text"))
         all_nodes:append(rgui.button("Button"))
+        replace_parent = rgui.stack("vertical")
+        replace_old = rgui.text("old")
+        replace_new = rgui.table(1)
+        replace_parent:append(replace_old)
+        replace_returned = replace_parent:replace(replace_old, replace_new)
+        lua_replaced_id = replace_returned:id()
         overlay = rgui.window("Overlay")
         overlay.backgroundAlpha = 0.4
         overlay.decorated = false
@@ -161,6 +167,9 @@ int main() {
     const rgui::Color row_color = lua["row_color"];
     const std::shared_ptr<rgui::ScrollArea> log = lua["log"];
     const std::shared_ptr<rgui::Stack> all_nodes = lua["all_nodes"];
+    const std::shared_ptr<rgui::Stack> replace_parent = lua["replace_parent"];
+    const std::shared_ptr<rgui::Text> replace_old = lua["replace_old"];
+    const std::shared_ptr<rgui::Table> replace_new = lua["replace_new"];
     const rgui::Anchor anchor = panel->anchor(*action);
     const std::optional<rgui::Anchor>& secondAnchor = panel->secondAnchor(*action);
     const rgui::Anchor stretched_anchor = panel->anchor(*stretched);
@@ -211,6 +220,8 @@ int main() {
                    && !stats->innerVerticalBorders() && !stats->outerVerticalBorders()
                    && log->size().width == 240.0F && log->size().height == 80.0F
                    && all_nodes->children().size() == 7
+                   && replace_parent->children().size() == 1 && replace_parent->children().front() == replace_new &&
+                   replace_old->parent() == nullptr && lua["lua_replaced_id"].get<rgui::NodeId>() == replace_old->id()
                    && overlay->backgroundAlpha() == 0.4F && !overlay->decorated() && !overlay->movable() &&
                    !overlay->resizable() && overlay->screenLayout() &&
                    overlay->screenLayout()->secondary

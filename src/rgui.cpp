@@ -56,6 +56,7 @@ void Container::set_tree_recursive(UiTree* tree) noexcept {
     for (const NodePtr& child : children_) child->set_tree_recursive(tree);
 }
 void Container::append(NodePtr child) {
+    if (tree_ && tree_->drawing_) throw std::logic_error("rgui cannot change structure while drawing");
     if (!child) throw std::invalid_argument("rgui cannot append a null node");
     if (child->parent_) throw std::logic_error("rgui node already has a parent");
     for (Node* ancestor = this; ancestor; ancestor = ancestor->parent_) {
@@ -66,6 +67,7 @@ void Container::append(NodePtr child) {
     children_.push_back(std::move(child));
 }
 NodePtr Container::remove(Node& child) {
+    if (tree_ && tree_->drawing_) throw std::logic_error("rgui cannot change structure while drawing");
     const auto position = std::find_if(children_.begin(), children_.end(), [&child](const NodePtr& candidate) { return candidate.get() == &child; });
     if (position == children_.end()) throw std::logic_error("rgui node is not a child of this container");
     NodePtr result = std::move(*position);
@@ -74,7 +76,28 @@ NodePtr Container::remove(Node& child) {
     result->set_tree_recursive(nullptr);
     return result;
 }
+NodePtr Container::replace(Node& old_child, NodePtr new_child) {
+    if (tree_ && tree_->drawing_) throw std::logic_error("rgui cannot change structure while drawing");
+    if (!new_child) throw std::invalid_argument("rgui cannot replace with a null node");
+    const auto position = std::find_if(children_.begin(), children_.end(), [&old_child](const NodePtr& candidate) {
+        return candidate.get() == &old_child;
+    });
+    if (position == children_.end()) throw std::logic_error("rgui node is not a child of this container");
+    if (new_child->parent_) throw std::logic_error("rgui replacement node already has a parent");
+    for (Node* ancestor = this; ancestor; ancestor = ancestor->parent_) {
+        if (ancestor == new_child.get()) throw std::logic_error("rgui cannot introduce a tree cycle");
+    }
+
+    NodePtr old_child_ptr = std::move(*position);
+    old_child_ptr->parent_ = nullptr;
+    old_child_ptr->set_tree_recursive(nullptr);
+    new_child->parent_ = this;
+    new_child->set_tree_recursive(tree_);
+    *position = std::move(new_child);
+    return old_child_ptr;
+}
 void Container::clear() {
+    if (tree_ && tree_->drawing_) throw std::logic_error("rgui cannot change structure while drawing");
     for (const NodePtr& child : children_) { child->parent_ = nullptr; child->set_tree_recursive(nullptr); }
     children_.clear();
 }
@@ -515,6 +538,7 @@ UiTree& UiTree::operator=(UiTree&& other) noexcept {
     return *this;
 }
 void UiTree::setRoot(NodePtr root) {
+    if (drawing_) throw std::logic_error("rgui cannot change structure while drawing");
     if (root && root->parent()) throw std::logic_error("rgui root already has a parent");
     if (root && root->tree_ && root->tree_ != this) throw std::logic_error("rgui root already belongs to a tree");
     if (root_ == root) return;
@@ -526,6 +550,11 @@ void UiTree::draw() {
     if (!root_ || !root_->visible()) return;
     ImGuiContext* const context = ImGui::GetCurrentContext();
     if (!context) throw std::logic_error("rgui drawing requires a current Dear ImGui context");
+    struct DrawingGuard final {
+        explicit DrawingGuard(bool& drawing) : drawing_(drawing) { drawing_ = true; }
+        ~DrawingGuard() { drawing_ = false; }
+        bool& drawing_;
+    } guard(drawing_);
     const std::string id = std::to_string(root_->id());
     ImGui::PushID(id.c_str()); root_->draw(); ImGui::PopID();
 }

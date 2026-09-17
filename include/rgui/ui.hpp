@@ -95,6 +95,9 @@ public:
     /// Structural changes must occur outside UiTree::draw().
     virtual void append(NodePtr child);
     [[nodiscard]] virtual NodePtr remove(Node& child);
+    /// Replaces a direct child in place and returns the detached former child.
+    /// Structural changes must occur outside UiTree::draw().
+    [[nodiscard]] NodePtr replace(Node& old_child, NodePtr new_child);
     virtual void clear();
     [[nodiscard]] const std::vector<NodePtr>& children() const noexcept { return children_; }
     void draw() override;
@@ -350,6 +353,7 @@ public:
     [[nodiscard]] std::size_t pendingEventCount() const noexcept { return events_.size(); }
 private:
     friend class Button;
+    friend class Container;
     friend class Text;
     struct Event {
         std::weak_ptr<Node> target;
@@ -361,6 +365,7 @@ private:
                        std::function<void(Node&)> callback);
     NodePtr root_;
     std::vector<Event> events_;
+    bool drawing_ = false;
 };
 
 } // namespace rgui
