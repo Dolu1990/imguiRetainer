@@ -220,8 +220,34 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
             }),
         "clearScreenLayout", [locked](Window& window) { locked([&] { window.clearScreenLayout(); }); });
     state.new_usertype<Table>("rgui.Table", sol::no_constructor,
-        sol::base_classes, sol::bases<Container, Node>(),
+        sol::base_classes, sol::bases<Node>(),
         "columns", [locked](const Table& table) { return locked([&] { return table.columns(); }); },
+        "rows", [locked](const Table& table) { return locked([&] { return table.rows(); }); },
+        "resizeRows", [locked](Table& table, std::size_t rows) {
+            locked([&] { table.resizeRows(rows); });
+        },
+        "cell", [locked, state](const Table& table, std::size_t row, std::size_t column) {
+            return locked([&] {
+                if (row == 0) throw std::invalid_argument("table row indices start at 1");
+                if (column == 0) throw std::invalid_argument("table column indices start at 1");
+                const NodePtr child = table.cell(row - 1, column - 1);
+                return child ? sol::make_object(state, child) : sol::make_object(state, sol::nil);
+            });
+        },
+        "setCell", [locked](Table& table, std::size_t row, std::size_t column, Node& child) {
+            locked([&] {
+                if (row == 0) throw std::invalid_argument("table row indices start at 1");
+                if (column == 0) throw std::invalid_argument("table column indices start at 1");
+                table.setCell(row - 1, column - 1, child.shared_from_this());
+            });
+        },
+        "clearCell", [locked](Table& table, std::size_t row, std::size_t column) {
+            locked([&] {
+                if (row == 0) throw std::invalid_argument("table row indices start at 1");
+                if (column == 0) throw std::invalid_argument("table column indices start at 1");
+                table.clearCell(row - 1, column - 1);
+            });
+        },
         "setHeader", [locked](Table& table, std::size_t column, const std::string& value) {
             locked([&] {
                 if (column == 0) throw std::invalid_argument("table column indices start at 1");

@@ -185,6 +185,77 @@ void Window::draw() {
 Table::Table(std::size_t columns) : columns_(columns) {
     if (columns == 0) throw std::invalid_argument("rgui table requires at least one column");
 }
+Table::~Table() {
+    for (Row& configured_row : rows_) {
+        for (NodePtr& child : configured_row.cells) {
+            if (child) child->parent_ = nullptr;
+        }
+    }
+}
+void Table::set_tree_recursive(UiTree* tree) noexcept {
+    Node::set_tree_recursive(tree);
+    for (Row& configured_row : rows_) {
+        for (const NodePtr& child : configured_row.cells) {
+            if (child) child->set_tree_recursive(tree);
+        }
+    }
+}
+Table::Row& Table::row(std::size_t index) {
+    if (index >= rows()) throw std::out_of_range("rgui table row is out of range");
+    return rows_[index];
+}
+const Table::Row& Table::row(std::size_t index) const {
+    if (index >= rows()) throw std::out_of_range("rgui table row is out of range");
+    return rows_[index];
+}
+void Table::detach(NodePtr& child) noexcept {
+    if (!child) return;
+    child->parent_ = nullptr;
+    child->set_tree_recursive(nullptr);
+    child.reset();
+}
+void Table::resizeRows(std::size_t count) {
+    if (tree_ && tree_->drawing_) throw std::logic_error("rgui cannot change structure while drawing");
+    if (count < rows()) {
+        for (std::size_t index = count; index < rows(); ++index) {
+            for (NodePtr& child : rows_[index].cells) detach(child);
+        }
+        rows_.resize(count);
+        return;
+    }
+    rows_.reserve(count);
+    while (rows() < count) rows_.push_back(Row{std::vector<NodePtr>(columns()), std::nullopt});
+}
+NodePtr Table::cell(std::size_t row_index, std::size_t column_index) const {
+    static_cast<void>(column(column_index));
+    return row(row_index).cells[column_index];
+}
+void Table::setCell(std::size_t row_index, std::size_t column_index, NodePtr child) {
+    static_cast<void>(column(column_index));
+    if (tree_ && tree_->drawing_) throw std::logic_error("rgui cannot change structure while drawing");
+    if (!child) throw std::invalid_argument("rgui cannot set a null table cell");
+    if (row_index < rows() && rows_[row_index].cells[column_index] == child) return;
+    if (child->parent_) throw std::logic_error("rgui node already has a parent");
+    for (Node* ancestor = this; ancestor; ancestor = ancestor->parent_) {
+        if (ancestor == child.get()) throw std::logic_error("rgui cannot introduce a tree cycle");
+    }
+    if (row_index >= rows()) resizeRows(row_index + 1);
+    NodePtr& destination = rows_[row_index].cells[column_index];
+    detach(destination);
+    child->parent_ = this;
+    child->set_tree_recursive(tree_);
+    destination = std::move(child);
+}
+void Table::clearCell(std::size_t row_index, std::size_t column_index) {
+    static_cast<void>(column(column_index));
+    if (tree_ && tree_->drawing_) throw std::logic_error("rgui cannot change structure while drawing");
+    detach(row(row_index).cells[column_index]);
+}
+void Table::draw_cell(Node& child) {
+    if (!child.visible()) return;
+    const std::string child_id = std::to_string(child.id());
+    ImGui::PushID(child_id.c_str()); child.draw(); ImGui::PopID();
+}
 Table::Column& Table::column(std::size_t index) {
     if (index >= columns()) throw std::out_of_range("rgui table column is out of range");
     return columns_[index];
@@ -227,14 +298,14 @@ void Table::setColumnJustify(std::size_t column, Justification horizontal,
     configured.vertical_justification = vertical;
 }
 void Table::setRowColor(std::size_t row, Color color) {
-    if (row >= row_colors_.size()) row_colors_.resize(row + 1);
-    row_colors_[row] = color;
+    if (row >= rows()) resizeRows(row + 1);
+    rows_[row].color = color;
 }
-void Table::clearRowColor(std::size_t row) noexcept {
-    if (row < row_colors_.size()) row_colors_[row].reset();
+void Table::clearRowColor(std::size_t row_index) {
+    row(row_index).color.reset();
 }
-std::optional<Color> Table::rowColor(std::size_t row) const noexcept {
-    return row < row_colors_.size() ? row_colors_[row] : std::nullopt;
+std::optional<Color> Table::rowColor(std::size_t row_index) const {
+    return row(row_index).color;
 }
 void Table::setInnerHorizontalBorders(bool value) noexcept { inner_horizontal_borders_ = value; }
 void Table::setOuterHorizontalBorders(bool value) noexcept { outer_horizontal_borders_ = value; }
@@ -282,10 +353,11 @@ void Table::draw() {
         const Column& configured = columns_[column_index];
         if (configured.sizing != ColumnSizing::fit) continue;
         fit_widths[column_index] = ImGui::CalcTextSize(configured.header.c_str()).x;
-        for (std::size_t child_index = column_index; child_index < children_.size();
-             child_index += columns()) {
-            const NodePtr& child = children_[child_index];
-            if (child->visible()) fit_widths[column_index] = std::max(fit_widths[column_index], child->measure().width);
+        for (const Row& configured_row : rows_) {
+            const NodePtr& child = configured_row.cells[column_index];
+            if (child && child->visible()) {
+                fit_widths[column_index] = std::max(fit_widths[column_index], child->measure().width);
+            }
         }
         fit_widths[column_index] = std::max(fit_widths[column_index], 1.0F);
     }
@@ -303,29 +375,25 @@ void Table::draw() {
         has_headers = has_headers || !configured.header.empty();
     }
     if (has_headers) ImGui::TableHeadersRow();
-    for (std::size_t row_start = 0; row_start < children_.size(); row_start += columns()) {
-        const std::size_t row_end = std::min(row_start + columns(), children_.size());
-        bool has_visible_child = false;
+    for (std::size_t row_index = 0; row_index < rows(); ++row_index) {
+        const Row& configured_row = rows_[row_index];
         float row_height = 0.0F;
-        for (std::size_t index = row_start; index < row_end; ++index) {
-            if (!children_[index]->visible()) continue;
-            has_visible_child = true;
-            row_height = std::max(row_height, children_[index]->measure().height);
+        for (const NodePtr& child : configured_row.cells) {
+            if (!child || !child->visible()) continue;
+            row_height = std::max(row_height, child->measure().height);
         }
-        if (!has_visible_child) continue;
         ImGui::TableNextRow(ImGuiTableRowFlags_None, row_height);
-        const std::size_t row = row_start / columns();
-        if (const std::optional<Color> color = rowColor(row)) {
+        if (const std::optional<Color>& color = configured_row.color) {
             const ImU32 packed = ImGui::ColorConvertFloat4ToU32(
                 {color->red(), color->green(), color->blue(), color->alpha()});
             ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, packed);
         }
-        for (std::size_t index = row_start; index < row_end; ++index) {
-            if (!children_[index]->visible()) continue;
-            const std::size_t column_index = index - row_start;
+        for (std::size_t column_index = 0; column_index < columns(); ++column_index) {
+            const NodePtr& child = configured_row.cells[column_index];
+            if (!child || !child->visible()) continue;
             ImGui::TableSetColumnIndex(static_cast<int>(column_index));
             const Column& configured = columns_[column_index];
-            const Size content_size = children_[index]->measure();
+            const Size content_size = child->measure();
             const ImVec2 cursor = ImGui::GetCursorPos();
             const ImVec2 available = ImGui::GetContentRegionAvail();
             const float offset_x = justification_offset(configured.horizontal_justification,
@@ -335,7 +403,7 @@ void Table::draw() {
             if (offset_x != 0.0F || offset_y != 0.0F) {
                 ImGui::SetCursorPos({cursor.x + offset_x, cursor.y + offset_y});
             }
-            draw_child(*children_[index]);
+            draw_cell(*child);
         }
     }
     ImGui::EndTable();

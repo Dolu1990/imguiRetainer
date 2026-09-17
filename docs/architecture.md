@@ -55,8 +55,10 @@ ignores the proposal through `measure(SizeProposal)`, then is drawn with its
 accepted size. Its dimensions can be fixed or fill either available ImGui
 content axis. A real overlay, table, popup, or other composite should be a
 specialized node that expresses ImGui's own begin/end protocol directly.
-`Table` is the first such composite: it owns a fixed positive number of
-columns, optional headers, and draws visible children as row-major cells.
+`Table` is the first such composite: it derives directly from `Node`, owns a
+fixed positive number of columns and an explicit resizable row/cell model, and
+draws each modeled row through ImGui's table API. Empty and hidden cells retain
+their coordinates, and empty rows are still emitted.
 Each column can justify its cell content horizontally and vertically with
 start, center, or end alignment; the default is start on both axes.
 
@@ -64,8 +66,8 @@ Button and text click callbacks are queued and must be delivered by `UiTree::flu
 at an application-selected safe point. A queued callback is discarded when its
 target is detached, reattached to another tree, or destroyed before dispatch.
 Callback errors, including Lua errors, propagate from `flushEvents()` to the
-embedding application. Structural changes (`append`, `remove`, or `clear`) are
-not permitted while `UiTree::draw()` is running.
+embedding application. Structural changes, including container edits and table
+row/cell edits, are not permitted while `UiTree::draw()` is running.
 
 `bindLua` receives an embedding-owned `std::recursive_mutex`. It serializes all
 Lua-exposed rgui object access with the embedding application's draw and event

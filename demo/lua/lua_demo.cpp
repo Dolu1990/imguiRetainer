@@ -64,10 +64,10 @@ int main() {
         local stat_value = rgui.text("0")
         stats:setHeader(1, "Item")
         stats:setHeader(2, "Value")
-        stats:append(rgui.text("Retained nodes"))
-        stats:append(rgui.text("Table cells are Lua-built"))
-        stats:append(rgui.text("Click count"))
-        stats:append(stat_value)
+        stats:setCell(1, 1, rgui.text("Retained nodes"))
+        stats:setCell(1, 2, rgui.text("Table cells are Lua-built"))
+        stats:setCell(2, 1, rgui.text("Click count"))
+        stats:setCell(2, 2, stat_value)
         for entry = 1, 16 do
             log:append(rgui.text("Scrollable Lua log entry " .. entry))
         end

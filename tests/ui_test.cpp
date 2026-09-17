@@ -103,11 +103,28 @@ private:
     rgui::NodePtr replacement_;
     bool& rejected_;
 };
+
+class SetTableCellDuringDrawNode final : public rgui::Node {
+public:
+    SetTableCellDuringDrawNode(rgui::Table& table, bool& rejected)
+        : table_(table), rejected_(rejected) {}
+    void draw() override {
+        try {
+            table_.setCell(0, 0, shared_from_this());
+        } catch (const std::logic_error&) {
+            rejected_ = true;
+        }
+    }
+private:
+    rgui::Table& table_;
+    bool& rejected_;
+};
 } // namespace
 
 int main() {
     static_assert(!std::is_copy_constructible_v<rgui::UiTree>);
     static_assert(!std::is_copy_assignable_v<rgui::UiTree>);
+    static_assert(!std::is_base_of_v<rgui::Container, rgui::Table>);
     auto root = std::make_shared<rgui::Window>("test window");
     auto first = std::make_shared<rgui::Button>("first");
     auto second = std::make_shared<rgui::Text>("second");
@@ -307,10 +324,11 @@ int main() {
     auto table = std::make_shared<rgui::Table>(2);
     table->setHeader(0, "Name");
     table->setHeader(1, "Value");
-    table->append(std::make_shared<rgui::Text>("Health"));
-    table->append(std::make_shared<rgui::Text>("100"));
+    table->setCell(0, 0, std::make_shared<rgui::Text>("Health"));
+    table->setCell(0, 1, std::make_shared<rgui::Text>("100"));
     root->append(table);
-    expect(table->columns() == 2 && table->header(0) == "Name" && table->children().size() == 2);
+    expect(table->columns() == 2 && table->rows() == 1 && table->header(0) == "Name" &&
+           table->cell(0, 0) != nullptr && table->cell(0, 1) != nullptr);
     const rgui::Color red{1.0F, 0.0F, 0.0F, 1.0F};
     expect(red.red() == 1.0F && red.green() == 0.0F && red.blue() == 0.0F && red.alpha() == 1.0F);
     bool rejected_color = true;
@@ -323,7 +341,7 @@ int main() {
     }
     expect(rejected_color);
     table->setRowColor(3, red);
-    expect(table->rowColor(3) && *table->rowColor(3) == red && !table->rowColor(2));
+    expect(table->rows() == 4 && table->rowColor(3) && *table->rowColor(3) == red && !table->rowColor(2));
     table->clearRowColor(3);
     expect(!table->rowColor(3));
     expect(table->innerHorizontalBorders() && table->outerHorizontalBorders() &&
@@ -360,6 +378,55 @@ int main() {
     try { static_cast<void>(rgui::Table(0)); } catch (const std::invalid_argument&) { rejected_empty_table = true; }
     expect(rejected_empty_table);
 
+    auto model_table = std::make_shared<rgui::Table>(2);
+    expect(model_table->rows() == 0);
+    auto retained_cell = std::make_shared<rgui::Button>("retained cell");
+    model_table->setCell(2, 1, retained_cell);
+    expect(model_table->rows() == 3 && model_table->cell(2, 1) == retained_cell &&
+           model_table->cell(0, 0) == nullptr && retained_cell->parent() == model_table.get());
+    model_table->setCell(2, 1, retained_cell);
+    auto replacement_cell = std::make_shared<rgui::Text>("replacement cell");
+    model_table->setCell(2, 1, replacement_cell);
+    expect(retained_cell->parent() == nullptr && replacement_cell->parent() == model_table.get());
+    model_table->clearCell(2, 1);
+    expect(model_table->cell(2, 1) == nullptr && replacement_cell->parent() == nullptr);
+    model_table->setCell(1, 0, replacement_cell);
+    model_table->resizeRows(1);
+    expect(model_table->rows() == 1 && replacement_cell->parent() == nullptr);
+    model_table->resizeRows(3);
+    expect(model_table->rows() == 3 && model_table->cell(2, 1) == nullptr);
+    bool rejected_cell_row = false;
+    bool rejected_cell_column = false;
+    bool rejected_clear_row = false;
+    bool rejected_null_cell = false;
+    bool rejected_parented_cell = false;
+    bool rejected_table_cycle = false;
+    try { static_cast<void>(model_table->cell(3, 0)); } catch (const std::out_of_range&) { rejected_cell_row = true; }
+    try { static_cast<void>(model_table->cell(0, 2)); } catch (const std::out_of_range&) { rejected_cell_column = true; }
+    try { model_table->clearCell(3, 0); } catch (const std::out_of_range&) { rejected_clear_row = true; }
+    try { model_table->setCell(0, 0, nullptr); } catch (const std::invalid_argument&) { rejected_null_cell = true; }
+    try { model_table->setCell(0, 0, first); } catch (const std::logic_error&) { rejected_parented_cell = true; }
+    auto cyclic_table = std::make_shared<rgui::Table>(1);
+    try { cyclic_table->setCell(0, 0, cyclic_table); } catch (const std::logic_error&) { rejected_table_cycle = true; }
+    expect(rejected_cell_row && rejected_cell_column && rejected_clear_row && rejected_null_cell &&
+           rejected_parented_cell && rejected_table_cycle);
+    auto table_button = std::make_shared<rgui::Button>("table callback");
+    bool detached_table_callback_called = false;
+    table_button->setOnClick([&detached_table_callback_called](rgui::Node&) {
+        detached_table_callback_called = true;
+    });
+    model_table->setCell(0, 0, table_button);
+    root->append(model_table);
+    table_button->activate();
+    model_table->clearCell(0, 0);
+    expect(tree.flushEvents() == 0 && !detached_table_callback_called);
+    auto destructor_cell = std::make_shared<rgui::Text>("destructor cell");
+    {
+        auto temporary_table = std::make_shared<rgui::Table>(1);
+        temporary_table->setCell(0, 0, destructor_cell);
+    }
+    expect(destructor_cell->parent() == nullptr);
+
     auto justified_table = std::make_shared<rgui::Table>(3);
     for (std::size_t column = 0; column < justified_table->columns(); ++column) {
         justified_table->setColumnWidth(column, 100.0F);
@@ -377,9 +444,9 @@ int main() {
     auto justified_start = std::make_shared<TablePositionRecordingNode>(rgui::Size{20.0F, 30.0F});
     auto justified_center = std::make_shared<TablePositionRecordingNode>(rgui::Size{20.0F, 20.0F});
     auto justified_end = std::make_shared<TablePositionRecordingNode>(rgui::Size{20.0F, 10.0F});
-    justified_table->append(justified_start);
-    justified_table->append(justified_center);
-    justified_table->append(justified_end);
+    justified_table->setCell(0, 0, justified_start);
+    justified_table->setCell(0, 1, justified_center);
+    justified_table->setCell(0, 2, justified_end);
 
     auto score_table = std::make_shared<rgui::Table>(3);
     score_table->setHeader(0, "Player");
@@ -391,15 +458,15 @@ int main() {
     auto player_width = std::make_shared<TableWidthRecordingNode>();
     auto score_width = std::make_shared<TableWidthRecordingNode>();
     auto details_width = std::make_shared<TableWidthRecordingNode>();
-    score_table->append(player_width);
-    score_table->append(score_width);
-    score_table->append(details_width);
+    score_table->setCell(0, 0, player_width);
+    score_table->setCell(0, 1, score_width);
+    score_table->setCell(0, 2, details_width);
 
     auto default_table = std::make_shared<rgui::Table>(2);
     auto default_first_width = std::make_shared<TableWidthRecordingNode>();
     auto default_second_width = std::make_shared<TableWidthRecordingNode>();
-    default_table->append(default_first_width);
-    default_table->append(default_second_width);
+    default_table->setCell(0, 0, default_first_width);
+    default_table->setCell(0, 1, default_second_width);
 
     auto replace_fit_parent = std::make_shared<rgui::Stack>();
     auto replace_fit_old = std::make_shared<rgui::Text>("old table");
@@ -408,8 +475,8 @@ int main() {
     replace_fit_new->setHeader(0, "Name");
     replace_fit_new->setColumnFit(0);
     replace_fit_new->setColumnWeight(1, 1.0F);
-    replace_fit_new->append(replace_fit_width);
-    replace_fit_new->append(std::make_shared<rgui::Text>("value"));
+    replace_fit_new->setCell(0, 0, replace_fit_width);
+    replace_fit_new->setCell(0, 1, std::make_shared<rgui::Text>("value"));
     replace_fit_parent->append(replace_fit_old);
     (void)replace_fit_parent->replace(*replace_fit_old, replace_fit_new);
 
@@ -418,9 +485,9 @@ int main() {
     auto first_visible_slot = std::make_shared<TablePositionRecordingNode>(rgui::Size{20.0F, 10.0F});
     auto next_row_first_slot = std::make_shared<TablePositionRecordingNode>(rgui::Size{20.0F, 10.0F});
     hidden_slot->setVisible(false);
-    logical_rows->append(hidden_slot);
-    logical_rows->append(first_visible_slot);
-    logical_rows->append(next_row_first_slot);
+    logical_rows->setCell(0, 0, hidden_slot);
+    logical_rows->setCell(0, 1, first_visible_slot);
+    logical_rows->setCell(1, 0, next_row_first_slot);
     logical_rows->setRowColor(1, rgui::Color{0.0F, 1.0F, 0.0F, 1.0F});
 
     auto scrollArea = std::make_shared<rgui::ScrollArea>(rgui::Size{160.0F, 40.0F});
@@ -431,6 +498,11 @@ int main() {
     bool replacement_during_draw_rejected = false;
     root->append(std::make_shared<ReplaceDuringDrawNode>(*root, std::make_shared<rgui::Text>("replacement"),
                                                          replacement_during_draw_rejected));
+    bool table_mutation_during_draw_rejected = false;
+    auto mutation_table = std::make_shared<rgui::Table>(1);
+    mutation_table->setCell(0, 0,
+        std::make_shared<SetTableCellDuringDrawNode>(*mutation_table, table_mutation_during_draw_rejected));
+    root->append(mutation_table);
 
     ImGui::CreateContext();
     ImGui::GetIO().DisplaySize = {640.0F, 480.0F};
@@ -465,7 +537,7 @@ int main() {
     CustomNode custom;
     custom.draw();
     tree.draw();
-    expect(replacement_during_draw_rejected);
+    expect(replacement_during_draw_rejected && table_mutation_during_draw_rejected);
     ImGui::SetNextWindowSize({500.0F, 200.0F}, ImGuiCond_Always);
     ImGui::Begin("replacement fit table test");
     replace_fit_parent->draw();

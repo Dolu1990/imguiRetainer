@@ -53,8 +53,20 @@ int main() {
         for _, name in ipairs(alignment_names) do
             alignment_table:setColumnJustify(1, name)
         end
-        stats:append(rgui.text("Health"))
-        stats:append(rgui.text("100"))
+        health_cell = rgui.text("Health")
+        value_cell = rgui.text("100")
+        stats:setCell(1, 1, health_cell)
+        stats:setCell(1, 2, value_cell)
+        lua_table_cell_matches = stats:cell(1, 1):id() == health_cell:id()
+        grid = rgui.table(2)
+        grid:resizeRows(2)
+        lua_empty_cell_is_nil = grid:cell(1, 1) == nil
+        grid_cell = rgui.text("grid")
+        grid:setCell(3, 2, grid_cell)
+        lua_grid_auto_grew = grid:rows() == 3 and grid:cell(3, 2):id() == grid_cell:id()
+        grid:clearCell(3, 2)
+        lua_grid_clear_is_nil = grid:cell(3, 2) == nil
+        lua_table_has_no_append = stats.append == nil
         log:append(rgui.text("First log entry"))
         all_nodes = rgui.stack("vertical")
         all_nodes:append(rgui.window("Window"))
@@ -125,6 +137,12 @@ int main() {
     const sol::protected_function_result invalid_table_row = lua.safe_script(R"(
         stats:setRowColor(0, rgui.Color(1, 0, 0, 1))
     )", sol::script_pass_on_error);
+    const sol::protected_function_result invalid_table_cell_row = lua.safe_script(
+        "stats:cell(0, 1)", sol::script_pass_on_error);
+    const sol::protected_function_result invalid_table_cell_column = lua.safe_script(
+        "stats:cell(1, 0)", sol::script_pass_on_error);
+    const sol::protected_function_result out_of_range_table_cell = lua.safe_script(
+        "stats:cell(99, 1)", sol::script_pass_on_error);
     const sol::protected_function_result invalid_color = lua.safe_script(
         "rgui.Color(1.1, 0, 0, 1)", sol::script_pass_on_error);
     const sol::protected_function_result invalid_justification_name = lua.safe_script(R"(
@@ -143,7 +161,8 @@ int main() {
     if (invalid_anchor_name.valid() || invalid_anchor_fraction.valid() ||
         invalid_table_sizing.valid() || invalid_table_width.valid() ||
         invalid_table_justification.valid() || invalid_justification_name.valid() ||
-        invalid_table_row.valid() || invalid_color.valid() ||
+        invalid_table_row.valid() || invalid_table_cell_row.valid() ||
+        invalid_table_cell_column.valid() || out_of_range_table_cell.valid() || invalid_color.valid() ||
         invalid_window_alpha.valid() || invalid_window_extent.valid() ||
         invalid_text_font_scale.valid() || invalid_button_font_scale.valid()) return 1;
 
@@ -214,7 +233,10 @@ int main() {
                    stretched_second_anchor->target == rgui::AnchorPoint{1.0F, 0.0F} &&
                    stretched_second_anchor->offsetX == -12.0F && stretched_second_anchor->offsetY == 64.0F
                    && stats->columns() == 2 && stats->header(0) == "Stat" && stats->header(1) == "Value"
-                   && stats->children().size() == 2 && lua["lua_border_state"].get<bool>()
+                   && stats->rows() == 2 && stats->cell(0, 0) != nullptr && stats->cell(0, 1) != nullptr
+                   && lua["lua_table_cell_matches"].get<bool>() && lua["lua_empty_cell_is_nil"].get<bool>()
+                   && lua["lua_grid_auto_grew"].get<bool>() && lua["lua_grid_clear_is_nil"].get<bool>()
+                   && lua["lua_table_has_no_append"].get<bool>() && lua["lua_border_state"].get<bool>()
                    && row_color == rgui::Color{1.0F, 0.0F, 0.0F, 1.0F} && !stats->rowColor(1)
                    && stats->innerHorizontalBorders() && stats->outerHorizontalBorders()
                    && !stats->innerVerticalBorders() && !stats->outerVerticalBorders()

@@ -44,6 +44,7 @@ private:
 };
 
 class Container;
+class Table;
 class Button;
 class Node;
 class UiTree;
@@ -77,6 +78,7 @@ public:
 
 private:
     friend class Container;
+    friend class Table;
     friend class Button;
     friend class Text;
     friend class UiTree;
@@ -128,14 +130,23 @@ private:
     Axis axis_;
 };
 
-/// Draws children as cells in a Dear ImGui table, in row-major order. A new
-/// row is started automatically after every `columns()` child slots. Hidden
-/// children leave their slot empty. Headers and rows use zero-based indices in
-/// C++.
-class Table final : public Container {
+/// Draws an explicit grid of retained nodes as a Dear ImGui table. Empty and
+/// hidden cells retain their coordinates. Rows and columns use zero-based
+/// indices in C++.
+class Table final : public Node {
 public:
     explicit Table(std::size_t columns);
+    ~Table() override;
     [[nodiscard]] std::size_t columns() const noexcept { return columns_.size(); }
+    [[nodiscard]] std::size_t rows() const noexcept { return rows_.size(); }
+    /// Resizes the explicit row model. Removed cells are detached.
+    void resizeRows(std::size_t rows);
+    /// Returns the node at a coordinate, or nullptr for an empty cell.
+    [[nodiscard]] NodePtr cell(std::size_t row, std::size_t column) const;
+    /// Inserts or replaces a cell. A row beyond rows() grows the table.
+    void setCell(std::size_t row, std::size_t column, NodePtr child);
+    /// Empties an existing cell and detaches its node.
+    void clearCell(std::size_t row, std::size_t column);
     void setHeader(std::size_t column, std::string_view value);
     [[nodiscard]] std::string_view header(std::size_t column) const;
     /// Sizes this column to its header and cell contents.
@@ -147,12 +158,11 @@ public:
     /// Positions every cell in this column within its available cell rectangle.
     void setColumnJustify(std::size_t column, Justification horizontal,
                           Justification vertical);
-    /// Overrides the background color of a logical row. Rows may be configured
-    /// before they have any child slots.
+    /// Overrides a row background color, growing the table if necessary.
     void setRowColor(std::size_t row, Color color);
     /// Removes a row background override and restores Dear ImGui's default.
-    void clearRowColor(std::size_t row) noexcept;
-    [[nodiscard]] std::optional<Color> rowColor(std::size_t row) const noexcept;
+    void clearRowColor(std::size_t row);
+    [[nodiscard]] std::optional<Color> rowColor(std::size_t row) const;
     void setInnerHorizontalBorders(bool value) noexcept;
     [[nodiscard]] bool innerHorizontalBorders() const noexcept { return inner_horizontal_borders_; }
     void setOuterHorizontalBorders(bool value) noexcept;
@@ -174,10 +184,19 @@ private:
         Justification horizontal_justification = Justification::start;
         Justification vertical_justification = Justification::start;
     };
+    struct Row {
+        std::vector<NodePtr> cells;
+        std::optional<Color> color;
+    };
     [[nodiscard]] Column& column(std::size_t index);
     [[nodiscard]] const Column& column(std::size_t index) const;
+    [[nodiscard]] Row& row(std::size_t index);
+    [[nodiscard]] const Row& row(std::size_t index) const;
+    void detach(NodePtr& child) noexcept;
+    void draw_cell(Node& child);
+    void set_tree_recursive(UiTree* tree) noexcept override;
     std::vector<Column> columns_;
-    std::vector<std::optional<Color>> row_colors_;
+    std::vector<Row> rows_;
     bool inner_horizontal_borders_ = true;
     bool outer_horizontal_borders_ = true;
     bool inner_vertical_borders_ = true;
@@ -354,6 +373,7 @@ public:
 private:
     friend class Button;
     friend class Container;
+    friend class Table;
     friend class Text;
     struct Event {
         std::weak_ptr<Node> target;
