@@ -61,9 +61,12 @@ private:
 
 class TableWidthRecordingNode final : public rgui::Node {
 public:
+    explicit TableWidthRecordingNode(rgui::Size size = {}) : size_(size) {}
+    [[nodiscard]] rgui::Size measure() const override { return size_; }
     void draw() override { width_ = ImGui::GetContentRegionAvail().x; }
     [[nodiscard]] float width() const noexcept { return width_; }
 private:
+    rgui::Size size_;
     float width_ = 0.0F;
 };
 
@@ -398,6 +401,18 @@ int main() {
     default_table->append(default_first_width);
     default_table->append(default_second_width);
 
+    auto replace_fit_parent = std::make_shared<rgui::Stack>();
+    auto replace_fit_old = std::make_shared<rgui::Text>("old table");
+    auto replace_fit_new = std::make_shared<rgui::Table>(2);
+    auto replace_fit_width = std::make_shared<TableWidthRecordingNode>(rgui::Size{175.0F, 10.0F});
+    replace_fit_new->setHeader(0, "Name");
+    replace_fit_new->setColumnFit(0);
+    replace_fit_new->setColumnWeight(1, 1.0F);
+    replace_fit_new->append(replace_fit_width);
+    replace_fit_new->append(std::make_shared<rgui::Text>("value"));
+    replace_fit_parent->append(replace_fit_old);
+    (void)replace_fit_parent->replace(*replace_fit_old, replace_fit_new);
+
     auto logical_rows = std::make_shared<rgui::Table>(2);
     auto hidden_slot = std::make_shared<TablePositionRecordingNode>(rgui::Size{20.0F, 10.0F});
     auto first_visible_slot = std::make_shared<TablePositionRecordingNode>(rgui::Size{20.0F, 10.0F});
@@ -451,6 +466,11 @@ int main() {
     custom.draw();
     tree.draw();
     expect(replacement_during_draw_rejected);
+    ImGui::SetNextWindowSize({500.0F, 200.0F}, ImGuiCond_Always);
+    ImGui::Begin("replacement fit table test");
+    replace_fit_parent->draw();
+    ImGui::End();
+    expect(replace_fit_width->width() >= 174.0F);
     overlay.setScreenLayout({{200.0F, 100.0F}, rgui::PanelExtent::fixed, rgui::PanelExtent::fixed,
                              {{0.5F, 0.5F}, {0.5F, 0.5F}}});
     overlay.draw();

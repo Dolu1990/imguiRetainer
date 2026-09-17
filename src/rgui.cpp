@@ -271,13 +271,35 @@ void Table::draw() {
     if (!ImGui::BeginTable(table_id.c_str(), static_cast<int>(columns()), flags)) {
         return;
     }
+
+    // ImGui lays out an automatic-width column before it has seen that frame's
+    // cells, so a newly created table gets a deliberately minimal first-frame
+    // work rectangle. Retained children already provide their natural sizes;
+    // use those sizes as the fixed-column request so a fitted column is usable
+    // immediately, including when a table replaces another node.
+    std::vector<float> fit_widths(columns(), 1.0F);
+    for (std::size_t column_index = 0; column_index < columns(); ++column_index) {
+        const Column& configured = columns_[column_index];
+        if (configured.sizing != ColumnSizing::fit) continue;
+        fit_widths[column_index] = ImGui::CalcTextSize(configured.header.c_str()).x;
+        for (std::size_t child_index = column_index; child_index < children_.size();
+             child_index += columns()) {
+            const NodePtr& child = children_[child_index];
+            if (child->visible()) fit_widths[column_index] = std::max(fit_widths[column_index], child->measure().width);
+        }
+        fit_widths[column_index] = std::max(fit_widths[column_index], 1.0F);
+    }
+
     bool has_headers = false;
-    for (const Column& configured : columns_) {
+    for (std::size_t column_index = 0; column_index < columns(); ++column_index) {
+        const Column& configured = columns_[column_index];
         const ImGuiTableColumnFlags column_flags = configured.sizing == ColumnSizing::stretch
                                                        ? ImGuiTableColumnFlags_WidthStretch
                                                        : ImGuiTableColumnFlags_WidthFixed;
         ImGui::TableSetupColumn(configured.header.empty() ? nullptr : configured.header.c_str(),
-                                column_flags, configured.width_or_weight);
+                                column_flags, configured.sizing == ColumnSizing::fit
+                                                  ? fit_widths[column_index]
+                                                  : configured.width_or_weight);
         has_headers = has_headers || !configured.header.empty();
     }
     if (has_headers) ImGui::TableHeadersRow();
