@@ -3,10 +3,28 @@
 `rgui` is a C++23 retainer-mode GUI library intended to render with
 [Dear ImGui](https://github.com/ocornut/imgui) and expose a clean Lua API via
 [sol2](https://github.com/ThePhD/sol2). It currently provides a deliberately
-small retained-mode vertical slice: `UiTree`, flow and anchored containers, text, buttons,
-direct Dear ImGui drawing, and optional Lua bindings. See
+small retained-mode vertical slice: `UiTree`, windows, flow, scroll, table, and
+anchored containers, text, buttons, direct Dear ImGui drawing, and optional Lua
+bindings. See
 [docs/architecture.md](docs/architecture.md) for the supported boundary and
 deferred design decisions.
+
+## Current retained API
+
+`Window` can use Dear ImGui's normal placement or an opt-in main-viewport
+layout, with fixed or fill extents and one or two anchors. It also exposes title
+bar, movement, resizing, and background-alpha controls. `ScrollArea` creates a
+fixed-size scrolling child region.
+
+`Table` has an explicit row/cell model. Columns can be fit-to-content, fixed
+width, or weighted; their contents can be justified horizontally and vertically.
+Tables also support headers, per-row colours, and independently configurable
+inner and outer borders. Empty and hidden cells retain their coordinates.
+
+`Text` and `Button` support font scaling and queued click callbacks. Call
+`UiTree::flushEvents()` after drawing, at a point where callbacks may safely
+change the retained tree. `Container::replace()` swaps a direct child in place;
+all structural changes must occur outside `UiTree::draw()`.
 
 ## Anchored layout
 
@@ -67,16 +85,41 @@ local full_surface = rgui.anchoredPanel("fill", "fill")
 - A compiler with C++23 support
 - Ninja or another CMake-supported build tool
 
-Dear ImGui and GLFW are pinned as Git submodules under `ext/`; initialize them
-after cloning the repository:
+Dear ImGui, GLFW, and sol2 are pinned as Git submodules under `ext/`; initialize
+them after cloning the repository:
 
 ```sh
 git submodule update --init --recursive
 ```
 
-sol2 is a pinned submodule. Lua remains owned by the embedding game: enabling
-the optional bindings requires its existing Lua CMake target through
-`RGUI_LUA_TARGET`.
+Lua remains owned by the embedding game: enabling the optional bindings requires
+its existing Lua CMake target through `RGUI_LUA_TARGET`.
+
+## Optional Lua bindings
+
+The core target has no Lua or sol2 dependency. Enable the non-installed,
+superproject-only `rgui::lua` target after the embedding project has made its
+Lua target available:
+
+```cmake
+find_package(Lua 5.4 REQUIRED)
+set(RGUI_BUILD_LUA_BINDINGS ON)
+set(RGUI_LUA_TARGET Lua::Lua)
+add_subdirectory(path/to/rgui)
+```
+
+Set these options before `add_subdirectory` when configuring the rgui project
+from a parent CMake project. The binding is registered with an
+embedding-owned Lua state by `rgui::bindLua`; callers also provide the
+`std::recursive_mutex` used to serialize rgui object access.
+
+`rgui_lua_demo` is an opt-in GLFW/OpenGL sample that configures a Lua-built
+retained tree. It finds Lua 5.4 when `RGUI_LUA_TARGET` is unset:
+
+```sh
+cmake -S . -B build/lua-demo -DRGUI_BUILD_LUA_DEMO=ON
+cmake --build build/lua-demo --target rgui_lua_demo
+```
 
 ## ImGui GLFW demo
 
@@ -119,7 +162,7 @@ Or add this directory with `add_subdirectory` and link the same target.
 
 - `include/` — public headers
 - `src/` — library implementation
-- `ext/` — pinned third-party Git submodules (Dear ImGui and GLFW)
+- `ext/` — pinned third-party Git submodules (Dear ImGui, GLFW, and sol2)
 - `demo/` — opt-in graphical demonstration applications
 - `tests/` — CTest tests without an external test framework
 - `cmake/` — install-package support

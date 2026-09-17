@@ -10,8 +10,15 @@ state.
 ## Current implementation state
 
 - Public target: `rgui::rgui`
-- Public headers: `<rgui/rgui.hpp>` and `<rgui/ui.hpp>`
+- Core public headers: `<rgui/rgui.hpp>` and `<rgui/ui.hpp>`; the optional
+  binding target additionally exposes `<rgui/lua.hpp>`.
 - Retained nodes: `Window`, `Stack`, `Table`, `ScrollArea`, `AnchoredPanel`, `Text`, and `Button`
+- `Window` supports normal ImGui placement or anchored main-viewport layout,
+  along with decoration, movement, resizing, and background-alpha controls.
+- `Table` supports fit, fixed, and weighted columns; per-column alignment;
+  headers; row colours; and independently configured inner and outer borders.
+- `Text` and `Button` support font scaling and queued click callbacks.
+- `Container::replace()` swaps a direct child in place.
 - Each node implements `draw()`; custom nodes may include
   `imgui.h` and use the Dear ImGui API directly.
 - `UiTree::draw()` validates that a current ImGui context exists, establishes
@@ -59,8 +66,16 @@ specialized node that expresses ImGui's own begin/end protocol directly.
 fixed positive number of columns and an explicit resizable row/cell model, and
 draws each modeled row through ImGui's table API. Empty and hidden cells retain
 their coordinates, and empty rows are still emitted.
-Each column can justify its cell content horizontally and vertically with
-start, center, or end alignment; the default is start on both axes.
+Each column can be fit-to-content, fixed width, or weighted, and can justify
+its cell content horizontally and vertically with start, center, or end
+alignment; the default is start on both axes. Tables can draw headers, colour
+individual rows, and independently enable or disable inner and outer borders.
+
+`Window` normally leaves placement to Dear ImGui. Its optional `WindowLayout`
+resolves fixed or fill dimensions against the main viewport on every draw; a
+primary anchor positions the window and a secondary anchor can derive either
+dimension. Window decoration, movement, resizing, and background alpha map to
+the corresponding Dear ImGui window controls.
 
 Button and text click callbacks are queued and must be delivered by `UiTree::flushEvents()`
 at an application-selected safe point. A queued callback is discarded when its
@@ -87,6 +102,15 @@ ctest --test-dir build --output-on-failure
 ```sh
 cmake -S . -B build/imgui-demo -DRGUI_BUILD_IMGUI_GLFW_DEMO=ON
 cmake --build build/imgui-demo --target rgui_imgui_glfw_demo
+```
+
+`rgui_lua_demo` is an opt-in GLFW/OpenGL visual demo that builds the retained
+tree from Lua. It enables the binding target and finds Lua 5.4 when
+`RGUI_LUA_TARGET` is not already supplied:
+
+```sh
+cmake -S . -B build/lua-demo -DRGUI_BUILD_LUA_DEMO=ON
+cmake --build build/lua-demo --target rgui_lua_demo
 ```
 
 ## Deferred decisions
