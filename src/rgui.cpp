@@ -1,6 +1,7 @@
 #include <rgui/rgui.hpp>
 
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include <algorithm>
 #include <atomic>
@@ -39,6 +40,82 @@ public:
     ScopedFontScale(const ScopedFontScale&) = delete;
     ScopedFontScale& operator=(const ScopedFontScale&) = delete;
 };
+
+std::string node_id_string(NodeId id) {
+    return std::to_string(id);
+}
+
+void draw_text_with_id(const char* text, const char* text_end, ImGuiID item_id) {
+    ImGuiWindow* window = ImGui::GetCurrentWindow();
+    if (window->SkipItems) return;
+    ImGuiContext& context = *GImGui;
+
+    if (text == text_end) text = text_end = "";
+    if (!text_end) text_end = text + ImStrlen(text);
+
+    const char* line = text;
+    const ImVec2 text_pos(window->DC.CursorPos.x,
+                          window->DC.CursorPos.y + window->DC.CurrLineTextBaseOffset);
+    const float wrap_pos_x = window->DC.TextWrapPos;
+    const bool wrap_enabled = wrap_pos_x >= 0.0F;
+    if (text_end - text <= 2000 || wrap_enabled) {
+        const float wrap_width = wrap_enabled
+                                     ? ImGui::CalcWrapWidthForPos(window->DC.CursorPos, wrap_pos_x)
+                                     : 0.0F;
+        const ImVec2 text_size = ImGui::CalcTextSize(text, text_end, false, wrap_width);
+        const ImRect bounds(text_pos, {text_pos.x + text_size.x, text_pos.y + text_size.y});
+        ImGui::ItemSize(text_size, 0.0F);
+        if (!ImGui::ItemAdd(bounds, item_id)) return;
+        ImGui::RenderTextWrapped(bounds.Min, text, text_end, wrap_width);
+        return;
+    }
+
+    const float line_height = ImGui::GetTextLineHeight();
+    ImVec2 position = text_pos;
+    ImVec2 text_size(0.0F, 0.0F);
+    if (!context.LogEnabled) {
+        const int lines_skippable = static_cast<int>((window->ClipRect.Min.y - text_pos.y) / line_height);
+        if (lines_skippable > 0) {
+            int lines_skipped = 0;
+            while (line < text_end && lines_skipped < lines_skippable) {
+                const char* line_end = static_cast<const char*>(ImMemchr(line, '\n', text_end - line));
+                if (!line_end) line_end = text_end;
+                line = line_end + 1;
+                ++lines_skipped;
+            }
+            position.y += lines_skipped * line_height;
+        }
+    }
+
+    if (line < text_end) {
+        ImRect line_bounds(position, {position.x + FLT_MAX, position.y + line_height});
+        while (line < text_end) {
+            if (ImGui::IsClippedEx(line_bounds, item_id)) break;
+            const char* line_end = static_cast<const char*>(ImMemchr(line, '\n', text_end - line));
+            if (!line_end) line_end = text_end;
+            text_size.x = ImMax(text_size.x, ImGui::CalcTextSize(line, line_end).x);
+            ImGui::RenderText(position, line, line_end, false);
+            line = line_end + 1;
+            line_bounds.Min.y += line_height;
+            line_bounds.Max.y += line_height;
+            position.y += line_height;
+        }
+
+        int lines_skipped = 0;
+        while (line < text_end) {
+            const char* line_end = static_cast<const char*>(ImMemchr(line, '\n', text_end - line));
+            if (!line_end) line_end = text_end;
+            line = line_end + 1;
+            ++lines_skipped;
+        }
+        position.y += lines_skipped * line_height;
+    }
+    text_size.y = position.y - text_pos.y;
+
+    const ImRect bounds(text_pos, {text_pos.x + text_size.x, text_pos.y + text_size.y});
+    ImGui::ItemSize(text_size, 0.0F);
+    ImGui::ItemAdd(bounds, item_id);
+}
 }
 
 Node::Node() : id_(next_node_id.fetch_add(1, std::memory_order_relaxed)) {}
@@ -590,7 +667,8 @@ Size Text::measure() const {
 void Text::draw() {
     {
         const ScopedFontScale font(font_scale_);
-        ImGui::TextUnformatted(value_.data(), value_.data() + value_.size());
+        const std::string id = node_id_string(id_);
+        draw_text_with_id(value_.data(), value_.data() + value_.size(), ImGui::GetID(id.c_str()));
     }
     if (enabled() && ImGui::IsItemClicked(ImGuiMouseButton_Left)) activate();
 }
@@ -617,7 +695,8 @@ void Button::draw() {
 void Button::draw(Size resolved_size) {
     const ScopedFontScale font(font_scale_);
     if (!enabled()) ImGui::BeginDisabled();
-    const bool clicked = ImGui::Button(label_.c_str(), {resolved_size.width, resolved_size.height});
+    const std::string stable_label = label_ + "###rgui-" + node_id_string(id_);
+    const bool clicked = ImGui::Button(stable_label.c_str(), {resolved_size.width, resolved_size.height});
     if (!enabled()) ImGui::EndDisabled();
     if (clicked && enabled()) activate();
 }

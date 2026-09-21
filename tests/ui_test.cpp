@@ -535,6 +535,70 @@ int main() {
     int height = 0;
     ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
     ImGui::NewFrame();
+
+    auto stable_id_root = std::make_shared<rgui::Window>("stable id test root");
+    auto stable_id_button = std::make_shared<rgui::Button>("before");
+    auto stable_id_text = std::make_shared<rgui::Text>("text before");
+    stable_id_root->append(stable_id_button);
+    stable_id_root->append(stable_id_text);
+    rgui::UiTree stable_id_tree;
+    stable_id_tree.setRoot(stable_id_root);
+    bool stable_id_button_clicked = false;
+    stable_id_button->setOnClick([&stable_id_button_clicked](rgui::Node&) {
+        stable_id_button_clicked = true;
+    });
+
+    ImGui::SetNextWindowPos({0.0F, 0.0F}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({300.0F, 200.0F}, ImGuiCond_Always);
+    ImGui::Begin("stable widget identity");
+    stable_id_button->draw();
+    const ImGuiID button_id_before = ImGui::GetItemID();
+    const ImVec2 button_min = ImGui::GetItemRectMin();
+    const ImVec2 button_max = ImGui::GetItemRectMax();
+    stable_id_text->draw();
+    const ImGuiID text_id_before = ImGui::GetItemID();
+    ImGui::End();
+    ImGui::EndFrame();
+
+    stable_id_button->setLabel("after");
+    stable_id_text->setValue("text after");
+    ImGui::NewFrame();
+    ImGui::SetNextWindowPos({0.0F, 0.0F}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({300.0F, 200.0F}, ImGuiCond_Always);
+    ImGui::Begin("stable widget identity");
+    stable_id_button->draw();
+    const ImGuiID button_id_after = ImGui::GetItemID();
+    stable_id_text->draw();
+    const ImGuiID text_id_after = ImGui::GetItemID();
+    ImGui::End();
+    ImGui::EndFrame();
+    expect(button_id_before == button_id_after && text_id_before == text_id_after &&
+           button_id_before != 0 && text_id_before != 0);
+
+    ImGui::GetIO().MousePos = {(button_min.x + button_max.x) * 0.5F,
+                               (button_min.y + button_max.y) * 0.5F};
+    ImGui::GetIO().MouseDown[ImGuiMouseButton_Left] = true;
+    ImGui::NewFrame();
+    ImGui::SetNextWindowPos({0.0F, 0.0F}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({300.0F, 200.0F}, ImGuiCond_Always);
+    ImGui::Begin("stable widget identity");
+    stable_id_button->draw();
+    ImGui::End();
+    ImGui::EndFrame();
+
+    ImGui::GetIO().MouseDown[ImGuiMouseButton_Left] = false;
+    ImGui::NewFrame();
+    ImGui::SetNextWindowPos({0.0F, 0.0F}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({300.0F, 200.0F}, ImGuiCond_Always);
+    ImGui::Begin("stable widget identity");
+    stable_id_button->draw();
+    ImGui::End();
+    ImGui::EndFrame();
+    expect(stable_id_tree.flushEvents() == 1 && stable_id_button_clicked);
+
+    ImGui::GetIO().MousePos = {-1000.0F, -1000.0F};
+    ImGui::NewFrame();
+
     rgui::Text scaled_text("font scaling");
     const rgui::Size normal_text_size = scaled_text.measure();
     const float font_size_before = ImGui::GetFontSize();

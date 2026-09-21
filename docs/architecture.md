@@ -93,9 +93,12 @@ primary anchor positions the window and a secondary anchor can derive either
 dimension. Window decoration, movement, resizing, and background alpha map to
 the corresponding Dear ImGui window controls.
 
-Button and text click callbacks are queued and must be delivered by `UiTree::flushEvents()`
-at an application-selected safe point. A queued callback is discarded when its
-target is detached, reattached to another tree, or destroyed before dispatch.
+Button and text nodes derive their Dear ImGui item identity from their immutable
+node ID rather than their displayed text. Changing a button label or text value
+therefore does not interrupt Dear ImGui interaction state. Click callbacks are
+queued and must be delivered by `UiTree::flushEvents()` at an
+application-selected safe point. A queued callback is discarded when its target
+is detached, reattached to another tree, or destroyed before dispatch.
 Callback errors, including Lua errors, propagate from `flushEvents()` to the
 embedding application. Structural changes, including container edits and table
 row/cell edits, are not permitted while `UiTree::draw()` is running.
