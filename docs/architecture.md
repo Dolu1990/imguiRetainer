@@ -18,6 +18,8 @@ state.
 - `Table` supports fit, fixed, and weighted columns; per-column alignment;
   headers; row colours; and independently configured inner and outer borders.
 - `Text` and `Button` support font scaling and queued click callbacks.
+- `UiTree` optionally converts fixed layout geometry from scale-1 logical
+  pixels to Dear ImGui pixels for each draw; the default scale is `1.0`.
 - `Container::replace()` swaps a direct child in place.
 - Each node implements `draw()`; custom nodes may include
   `imgui.h` and use the Dear ImGui API directly.
@@ -70,6 +72,20 @@ Each column can be fit-to-content, fixed width, or weighted, and can justify
 its cell content horizontally and vertically with start, center, or end
 alignment; the default is start on both axes. Tables can draw headers, colour
 individual rows, and independently enable or disable inner and outer borders.
+
+All caller-supplied fixed dimensions and anchor offsets are stored as logical
+pixels. `Window`, `AnchoredPanel`, `ScrollArea`, and fixed table columns apply
+the owning tree's layout scale only at their ImGui-facing measurement or draw
+sites. Fill extents, normalized anchor fractions, fitted widths, stretch
+weights, and natural text/button measurements remain in Dear ImGui's own
+coordinate system. A secondary anchor derives its proposal after its scaled
+offsets have been added to the physical target coordinates. Changing the
+scale never rewrites stored geometry, and a tree's scale cannot change while
+that tree is drawing.
+
+Custom C++ nodes can call the protected `Node::layoutScale()` helper when they
+convert their own logical geometry. It returns the owning tree's scale and
+returns `1.0` for detached nodes.
 
 `Window` normally leaves placement to Dear ImGui. Its optional `WindowLayout`
 resolves fixed or fill dimensions against the main viewport on every draw; a

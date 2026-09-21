@@ -23,6 +23,13 @@ void validate_size(Size size);
 void validate_font_scale(float scale);
 void validate_color_component(float value);
 
+float scale_length(float value, float scale) { return value * scale; }
+Size scale_size(Size size, float scale) {
+    size.width = scale_length(size.width, scale);
+    size.height = scale_length(size.height, scale);
+    return size;
+}
+
 class ScopedFontScale final {
 public:
     explicit ScopedFontScale(float scale) {
@@ -40,6 +47,7 @@ void Node::setEnabled(bool value) noexcept { enabled_ = value; }
 Size Node::measure() const { return {}; }
 Size Node::measure(const SizeProposal&) const { return measure(); }
 void Node::draw(Size) { draw(); }
+float Node::layoutScale() const noexcept { return tree_ ? tree_->layoutScale() : 1.0F; }
 void Node::set_tree_recursive(UiTree* tree) noexcept { if (tree_ != tree) { tree_ = tree; ++attachment_generation_; } }
 
 Color::Color(float red, float green, float blue, float alpha)
@@ -157,23 +165,26 @@ void Window::draw() {
         const WindowLayout& layout = *screen_layout_;
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
         Size size = layout.size;
+        const float scale = layoutScale();
         if (layout.widthExtent == PanelExtent::fill) size.width = viewport->Size.x;
+        else size.width = scale_length(size.width, scale);
         if (layout.heightExtent == PanelExtent::fill) size.height = viewport->Size.y;
+        else size.height = scale_length(size.height, scale);
         if (layout.secondary) {
             const Anchor& secondary = *layout.secondary;
             const ImVec2 primary_target = point_in_rect(layout.primary.target, {viewport->Size.x, viewport->Size.y});
             const ImVec2 secondary_target = point_in_rect(secondary.target, {viewport->Size.x, viewport->Size.y});
-            if (const auto width = proposed_axis(primary_target.x + layout.primary.offsetX,
-                                                 secondary_target.x + secondary.offsetX,
+            if (const auto width = proposed_axis(primary_target.x + scale_length(layout.primary.offsetX, scale),
+                                                 secondary_target.x + scale_length(secondary.offsetX, scale),
                                                  layout.primary.self.x, secondary.self.x)) size.width = *width;
-            if (const auto height = proposed_axis(primary_target.y + layout.primary.offsetY,
-                                                  secondary_target.y + secondary.offsetY,
+            if (const auto height = proposed_axis(primary_target.y + scale_length(layout.primary.offsetY, scale),
+                                                  secondary_target.y + scale_length(secondary.offsetY, scale),
                                                   layout.primary.self.y, secondary.self.y)) size.height = *height;
         }
         const ImVec2 target = point_in_rect(layout.primary.target, {viewport->Size.x, viewport->Size.y});
         const ImVec2 self = point_in_rect(layout.primary.self, {size.width, size.height});
-        ImGui::SetNextWindowPos({viewport->Pos.x + target.x + layout.primary.offsetX - self.x,
-                                 viewport->Pos.y + target.y + layout.primary.offsetY - self.y}, ImGuiCond_Always);
+        ImGui::SetNextWindowPos({viewport->Pos.x + target.x + scale_length(layout.primary.offsetX, scale) - self.x,
+                                 viewport->Pos.y + target.y + scale_length(layout.primary.offsetY, scale) - self.y}, ImGuiCond_Always);
         ImGui::SetNextWindowSize({size.width, size.height}, ImGuiCond_Always);
     }
     const std::string title = title_ + "###rgui-" + std::to_string(id());
@@ -371,7 +382,9 @@ void Table::draw() {
         ImGui::TableSetupColumn(configured.header.empty() ? nullptr : configured.header.c_str(),
                                 column_flags, configured.sizing == ColumnSizing::fit
                                                   ? fit_widths[column_index]
-                                                  : configured.width_or_weight);
+                                                  : configured.sizing == ColumnSizing::fixed
+                                                        ? scale_length(configured.width_or_weight, layoutScale())
+                                                        : configured.width_or_weight);
         has_headers = has_headers || !configured.header.empty();
     }
     if (has_headers) ImGui::TableHeadersRow();
@@ -422,7 +435,8 @@ void ScrollArea::setSize(Size size) {
 }
 void ScrollArea::draw() {
     const std::string area_id = "##rgui-scroll-area-" + std::to_string(id());
-    const bool draw_contents = ImGui::BeginChild(area_id.c_str(), {size_.width, size_.height},
+    const Size physical_size = scale_size(size_, layoutScale());
+    const bool draw_contents = ImGui::BeginChild(area_id.c_str(), {physical_size.width, physical_size.height},
                                                  ImGuiChildFlags_Borders);
     if (draw_contents) draw_children();
     ImGui::EndChild();
@@ -480,6 +494,9 @@ void AnchoredPanel::setWidthExtent(PanelExtent value) noexcept { width_extent_ =
 void AnchoredPanel::setHeightExtent(PanelExtent value) noexcept { height_extent_ = value; }
 Size AnchoredPanel::measure() const {
     Size result = size_;
+    const float scale = layoutScale();
+    if (width_extent_ == PanelExtent::fixed) result.width = scale_length(result.width, scale);
+    if (height_extent_ == PanelExtent::fixed) result.height = scale_length(result.height, scale);
     if (!ImGui::GetCurrentContext()) return result;
     const ImVec2 available = ImGui::GetContentRegionAvail();
     if (width_extent_ == PanelExtent::fill) result.width = available.x;
@@ -540,18 +557,20 @@ void AnchoredPanel::draw() {
             const Anchor& secondary = *child_anchors.secondary;
             const ImVec2 primary_target = point_in_rect(child_anchor.target, resolved_size);
             const ImVec2 secondary_target = point_in_rect(secondary.target, resolved_size);
-            proposal.width = proposed_axis(primary_target.x + child_anchor.offsetX,
-                                           secondary_target.x + secondary.offsetX,
+            const float scale = layoutScale();
+            proposal.width = proposed_axis(primary_target.x + scale_length(child_anchor.offsetX, scale),
+                                           secondary_target.x + scale_length(secondary.offsetX, scale),
                                            child_anchor.self.x, secondary.self.x);
-            proposal.height = proposed_axis(primary_target.y + child_anchor.offsetY,
-                                            secondary_target.y + secondary.offsetY,
+            proposal.height = proposed_axis(primary_target.y + scale_length(child_anchor.offsetY, scale),
+                                            secondary_target.y + scale_length(secondary.offsetY, scale),
                                             child_anchor.self.y, secondary.self.y);
         }
         const Size child_size = child.measure(proposal);
         const ImVec2 target = point_in_rect(child_anchor.target, resolved_size);
         const ImVec2 self = point_in_rect(child_anchor.self, child_size);
-        ImGui::SetCursorScreenPos({origin.x + target.x + child_anchor.offsetX - self.x,
-                                   origin.y + target.y + child_anchor.offsetY - self.y});
+        const float scale = layoutScale();
+        ImGui::SetCursorScreenPos({origin.x + target.x + scale_length(child_anchor.offsetX, scale) - self.x,
+                                   origin.y + target.y + scale_length(child_anchor.offsetY, scale) - self.y});
         draw_child(child, child_size);
     }
     ImGui::SetCursorScreenPos(origin);
@@ -605,7 +624,8 @@ void Button::draw(Size resolved_size) {
 
 UiTree::~UiTree() noexcept { setRoot(nullptr); }
 UiTree::UiTree(UiTree&& other) noexcept
-    : root_(std::move(other.root_)), events_(std::move(other.events_)) {
+    : root_(std::move(other.root_)), events_(std::move(other.events_)),
+      layout_scale_(other.layout_scale_) {
     if (root_) root_->set_tree_recursive(this);
     for (Event& event : events_) {
         if (const std::shared_ptr<Node> target = event.target.lock()) {
@@ -619,6 +639,7 @@ UiTree& UiTree::operator=(UiTree&& other) noexcept {
     events_.clear();
     root_ = std::move(other.root_);
     events_ = std::move(other.events_);
+    layout_scale_ = other.layout_scale_;
     if (root_) root_->set_tree_recursive(this);
     for (Event& event : events_) {
         if (const std::shared_ptr<Node> target = event.target.lock()) {
@@ -626,6 +647,13 @@ UiTree& UiTree::operator=(UiTree&& other) noexcept {
         }
     }
     return *this;
+}
+void UiTree::setLayoutScale(float scale) {
+    if (drawing_) throw std::logic_error("rgui cannot change layout scale while drawing");
+    if (!std::isfinite(scale) || scale <= 0.0F) {
+        throw std::invalid_argument("rgui layout scale must be finite and greater than zero");
+    }
+    layout_scale_ = scale;
 }
 void UiTree::setRoot(NodePtr root) {
     if (drawing_) throw std::logic_error("rgui cannot change structure while drawing");

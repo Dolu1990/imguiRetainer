@@ -13,7 +13,8 @@ namespace rgui {
 
 using NodeId = std::uint64_t;
 
-/// A size in Dear ImGui pixels.
+/// A size in scale-1 logical pixels. Built-in layout nodes convert fixed
+/// dimensions to Dear ImGui pixels while measuring or drawing.
 struct Size {
     float width = 0.0F;
     float height = 0.0F;
@@ -75,6 +76,12 @@ public:
     /// Draws using the size accepted by measure(SizeProposal). The default
     /// preserves existing custom nodes by calling draw().
     virtual void draw(Size resolved_size);
+
+protected:
+    /// Returns the owning tree's layout scale, or 1.0 for a detached node.
+    /// Custom nodes should use this when converting their own logical geometry
+    /// to Dear ImGui pixels.
+    [[nodiscard]] float layoutScale() const noexcept;
 
 private:
     friend class Container;
@@ -151,7 +158,7 @@ public:
     [[nodiscard]] std::string_view header(std::size_t column) const;
     /// Sizes this column to its header and cell contents.
     void setColumnFit(std::size_t column);
-    /// Requests a positive fixed width in Dear ImGui pixels for this column.
+    /// Requests a positive fixed width in logical pixels for this column.
     void setColumnWidth(std::size_t column, float width);
     /// Makes this column share remaining width in proportion to a positive weight.
     void setColumnWeight(std::size_t column, float weight);
@@ -203,8 +210,9 @@ private:
     bool outer_vertical_borders_ = true;
 };
 
-/// Draws children in a bordered fixed-size region. Dear ImGui adds scrollbars
-/// automatically when the children's contents overflow this region.
+/// Draws children in a bordered fixed-size region. The fixed size is in
+/// logical pixels; Dear ImGui adds scrollbars when the children's contents
+/// overflow the scaled region.
 class ScrollArea final : public Container {
 public:
     explicit ScrollArea(Size size);
@@ -227,10 +235,10 @@ struct AnchorPoint {
 
 /// Positions a child relative to an AnchoredPanel. `self` and `target` are
 /// normalized points in their respective rectangles; the child is placed so
-/// these points coincide before the pixel offset is applied. A second anchor
-/// can be supplied to an AnchoredPanel child; differing self points on an axis
-/// derive a size proposal for that axis. Fractions must be finite and in the
-/// inclusive range from zero to one.
+/// these points coincide before the logical-pixel offset is applied. A second
+/// anchor can be supplied to an AnchoredPanel child; differing self points on
+/// an axis derive a size proposal for that axis. Fractions must be finite and
+/// in the inclusive range from zero to one.
 struct Anchor {
     AnchorPoint self{};
     AnchorPoint target{};
@@ -241,9 +249,10 @@ struct Anchor {
 /// How an AnchoredPanel resolves one of its dimensions.
 enum class PanelExtent { fixed, fill };
 
-/// Describes an opt-in main-viewport layout for a Window. The primary anchor
-/// positions the window; a secondary anchor may derive its width and/or
-/// height when its corresponding self coordinate differs.
+/// Describes an opt-in main-viewport layout for a Window. Fixed dimensions and
+/// anchor offsets are in logical pixels. The primary anchor positions the
+/// window; a secondary anchor may derive its width and/or height when its
+/// corresponding self coordinate differs.
 struct WindowLayout {
     Size size{};
     PanelExtent widthExtent = PanelExtent::fixed;
@@ -253,7 +262,9 @@ struct WindowLayout {
 };
 
 /// A retained Dear ImGui window. Screen layout, when configured, is resolved
-/// against Dear ImGui's main viewport on every draw.
+/// against Dear ImGui's main viewport on every draw. Fixed dimensions and
+/// offsets are converted from logical pixels using the owning UiTree's layout
+/// scale.
 class Window final : public Container {
 public:
     explicit Window(std::string title = {});
@@ -280,8 +291,8 @@ private:
     std::optional<WindowLayout> screen_layout_;
 };
 
-/// A retained layout surface. Fixed dimensions use the supplied Size; fill
-/// dimensions use the current Dear ImGui content region when drawn.
+/// A retained layout surface. Fixed dimensions use the supplied logical Size;
+/// fill dimensions use the current Dear ImGui content region when drawn.
 /// It owns each child's placement while the child remains responsible for
 /// measuring and drawing itself.
 class AnchoredPanel final : public Container {
@@ -365,6 +376,12 @@ public:
     UiTree(UiTree&& other) noexcept;
     UiTree& operator=(UiTree&& other) noexcept;
 
+    /// Sets the logical-pixel to Dear ImGui-pixel scale for this tree. The
+    /// value must be finite and greater than zero, and cannot change while the
+    /// tree is drawing.
+    void setLayoutScale(float scale);
+    [[nodiscard]] float layoutScale() const noexcept { return layout_scale_; }
+
     void setRoot(NodePtr root);
     [[nodiscard]] const NodePtr& root() const noexcept { return root_; }
     void draw();
@@ -385,6 +402,7 @@ private:
                        std::function<void(Node&)> callback);
     NodePtr root_;
     std::vector<Event> events_;
+    float layout_scale_ = 1.0F;
     bool drawing_ = false;
 };
 

@@ -18,6 +18,27 @@ public:
     void draw() override { ImGui::TextUnformatted("custom node"); }
 };
 
+class LayoutScaleNode final : public rgui::Node {
+public:
+    [[nodiscard]] float effectiveScale() const noexcept { return layoutScale(); }
+    void draw() override {}
+};
+
+class ScaleMutationNode final : public rgui::Node {
+public:
+    ScaleMutationNode(rgui::UiTree& tree, bool& rejected) : tree_(tree), rejected_(rejected) {}
+    void draw() override {
+        try {
+            tree_.setLayoutScale(1.0F);
+        } catch (const std::logic_error&) {
+            rejected_ = true;
+        }
+    }
+private:
+    rgui::UiTree& tree_;
+    bool& rejected_;
+};
+
 class RecordingNode final : public rgui::Node {
 public:
     explicit RecordingNode(rgui::Size size) : size_(size) {}
@@ -51,11 +72,14 @@ private:
 class ScrollRecordingNode final : public rgui::Node {
 public:
     void draw() override {
+        window_size_ = ImGui::GetWindowSize();
         for (int index = 0; index < 20; ++index) ImGui::TextUnformatted("scrollable content");
         scroll_max_y_ = ImGui::GetScrollMaxY();
     }
+    [[nodiscard]] ImVec2 window_size() const noexcept { return window_size_; }
     [[nodiscard]] float scroll_max_y() const noexcept { return scroll_max_y_; }
 private:
+    ImVec2 window_size_{};
     float scroll_max_y_ = 0.0F;
 };
 
@@ -623,6 +647,154 @@ int main() {
     overlay.clearScreenLayout();
     expect(!overlay.screenLayout());
     ImGui::EndFrame();
+
+    rgui::UiTree layout_tree;
+    expect(layout_tree.layoutScale() == 1.0F);
+    for (const float invalid : {0.0F, -1.0F, std::numeric_limits<float>::infinity(),
+                                -std::numeric_limits<float>::infinity(),
+                                std::numeric_limits<float>::quiet_NaN()}) {
+        bool rejected = false;
+        try { layout_tree.setLayoutScale(invalid); } catch (const std::invalid_argument&) { rejected = true; }
+        expect(rejected && layout_tree.layoutScale() == 1.0F);
+    }
+
+    auto scale_root = std::make_shared<rgui::Window>("layout scale test");
+    scale_root->setDecorated(false);
+    scale_root->setMovable(false);
+    scale_root->setResizable(false);
+    scale_root->setScreenLayout({{200.0F, 100.0F}, rgui::PanelExtent::fixed, rgui::PanelExtent::fixed,
+                                 {{0.5F, 0.5F}, {0.5F, 0.5F}, 10.0F, 20.0F}});
+    auto scale_stack = std::make_shared<rgui::Stack>();
+    auto scale_panel = std::make_shared<rgui::AnchoredPanel>(rgui::Size{100.0F, 50.0F});
+    auto scale_proposal = std::make_shared<ProposalRecordingNode>();
+    scale_panel->append(scale_proposal,
+                        {{0.0F, 0.0F}, {0.0F, 0.0F}, 10.0F, 5.0F},
+                        {{1.0F, 1.0F}, {1.0F, 1.0F}, -10.0F, -5.0F});
+    scale_stack->append(scale_panel);
+    auto scale_scroll = std::make_shared<rgui::ScrollArea>(rgui::Size{80.0F, 30.0F});
+    auto scale_scroll_contents = std::make_shared<ScrollRecordingNode>();
+    scale_scroll->append(scale_scroll_contents);
+    scale_stack->append(scale_scroll);
+    auto scale_table = std::make_shared<rgui::Table>(3);
+    scale_table->setColumnWidth(0, 40.0F);
+    scale_table->setColumnFit(1);
+    scale_table->setColumnWeight(2, 2.0F);
+    auto scale_fixed_width = std::make_shared<TableWidthRecordingNode>();
+    auto scale_fit_width = std::make_shared<TableWidthRecordingNode>(rgui::Size{50.0F, 10.0F});
+    auto scale_stretch_width = std::make_shared<TableWidthRecordingNode>();
+    scale_table->setCell(0, 0, scale_fixed_width);
+    scale_table->setCell(0, 1, scale_fit_width);
+    scale_table->setCell(0, 2, scale_stretch_width);
+    scale_stack->append(scale_table);
+    auto scale_fill_panel = std::make_shared<rgui::AnchoredPanel>(
+        rgui::Size{0.0F, 0.0F}, rgui::PanelExtent::fill, rgui::PanelExtent::fill);
+    scale_stack->append(scale_fill_panel);
+    bool scale_change_rejected = false;
+    scale_stack->append(std::make_shared<ScaleMutationNode>(layout_tree, scale_change_rejected));
+    auto scale_text = std::make_shared<rgui::Text>("natural text");
+    auto scale_button = std::make_shared<rgui::Button>("natural button");
+    rgui::Text natural_text_baseline("natural text");
+    rgui::Button natural_button_baseline("natural button");
+    rgui::Size natural_text_size;
+    rgui::Size natural_button_size;
+    scale_stack->append(scale_text);
+    scale_stack->append(scale_button);
+    scale_root->append(scale_stack);
+    layout_tree.setRoot(scale_root);
+    auto detached_scale_node = std::make_shared<LayoutScaleNode>();
+    expect(detached_scale_node->effectiveScale() == 1.0F);
+    auto attached_scale_node = std::make_shared<LayoutScaleNode>();
+    scale_stack->append(attached_scale_node);
+
+    layout_tree.setLayoutScale(2.0F);
+    expect(layout_tree.layoutScale() == 2.0F && attached_scale_node->effectiveScale() == 2.0F &&
+           scale_panel->size().width == 100.0F && scale_panel->size().height == 50.0F &&
+           scale_scroll->size().width == 80.0F && scale_scroll->size().height == 30.0F &&
+           scale_root->screenLayout()->size.width == 200.0F &&
+           scale_root->screenLayout()->size.height == 100.0F);
+    ImGui::NewFrame();
+    natural_text_size = natural_text_baseline.measure();
+    natural_button_size = natural_button_baseline.measure();
+    layout_tree.draw();
+    const std::string scale_window_name = "layout scale test###rgui-" + std::to_string(scale_root->id());
+    ImGuiWindow* scale_window = ImGui::FindWindowByName(scale_window_name.c_str());
+    expect(scale_window && std::fabs(scale_window->Pos.x - 140.0F) < 1.0F &&
+           std::fabs(scale_window->Pos.y - 180.0F) < 1.0F &&
+           std::fabs(scale_window->Size.x - 400.0F) < 1.0F &&
+           std::fabs(scale_window->Size.y - 200.0F) < 1.0F);
+    expect(scale_proposal->proposal().width && *scale_proposal->proposal().width == 160.0F &&
+           scale_proposal->proposal().height && *scale_proposal->proposal().height == 80.0F &&
+           scale_proposal->drawn_size().width == 160.0F && scale_proposal->drawn_size().height == 80.0F);
+    expect(std::fabs(scale_scroll_contents->window_size().x - 160.0F) < 1.0F &&
+           std::fabs(scale_scroll_contents->window_size().y - 60.0F) < 1.0F);
+    const float fixed_table_width_scaled = scale_fixed_width->width();
+    const float fit_table_width_scaled = scale_fit_width->width();
+    expect(fixed_table_width_scaled >= 78.0F && fixed_table_width_scaled <= 82.0F &&
+           fit_table_width_scaled >= 49.0F && fit_table_width_scaled <= 51.0F &&
+           std::fabs(scale_text->measure().width - natural_text_size.width) < 0.01F &&
+           std::fabs(scale_text->measure().height - natural_text_size.height) < 0.01F &&
+           std::fabs(scale_button->measure().width - natural_button_size.width) < 0.01F &&
+           std::fabs(scale_button->measure().height - natural_button_size.height) < 0.01F);
+    ImGui::Begin("layout fill scale test");
+    const ImVec2 fill_available = ImGui::GetContentRegionAvail();
+    const rgui::Size filled_scale_panel = scale_fill_panel->measure();
+    expect(std::fabs(filled_scale_panel.width - fill_available.x) < 0.01F &&
+           std::fabs(filled_scale_panel.height - fill_available.y) < 0.01F);
+    ImGui::End();
+    ImGui::EndFrame();
+
+    layout_tree.setLayoutScale(1.0F);
+    expect(layout_tree.layoutScale() == 1.0F);
+    ImGui::NewFrame();
+    layout_tree.draw();
+    scale_window = ImGui::FindWindowByName(scale_window_name.c_str());
+    expect(scale_window && std::fabs(scale_window->Pos.x - 230.0F) < 1.0F &&
+           std::fabs(scale_window->Pos.y - 210.0F) < 1.0F &&
+           std::fabs(scale_window->Size.x - 200.0F) < 1.0F &&
+           std::fabs(scale_window->Size.y - 100.0F) < 1.0F);
+    expect(scale_proposal->proposal().width && *scale_proposal->proposal().width == 80.0F &&
+           scale_proposal->proposal().height && *scale_proposal->proposal().height == 40.0F &&
+           scale_proposal->drawn_size().width == 80.0F && scale_proposal->drawn_size().height == 40.0F);
+    expect(std::fabs(scale_scroll_contents->window_size().x - 80.0F) < 1.0F &&
+           std::fabs(scale_scroll_contents->window_size().y - 30.0F) < 1.0F &&
+           std::fabs(scale_fixed_width->width() * 2.0F - fixed_table_width_scaled) < 2.0F &&
+           std::fabs(scale_fit_width->width() - fit_table_width_scaled) < 1.0F);
+    expect(scale_change_rejected);
+    ImGui::EndFrame();
+
+    rgui::WindowLayout secondary_window_layout{{1.0F, 1.0F}, rgui::PanelExtent::fixed,
+                                               rgui::PanelExtent::fixed,
+                                               {{0.0F, 0.0F}, {0.0F, 0.0F}, 10.0F, 20.0F}};
+    secondary_window_layout.secondary = rgui::Anchor{{1.0F, 1.0F}, {1.0F, 1.0F}, -10.0F, -20.0F};
+    scale_root->setScreenLayout(secondary_window_layout);
+    layout_tree.setLayoutScale(2.0F);
+    ImGui::NewFrame();
+    layout_tree.draw();
+    scale_window = ImGui::FindWindowByName(scale_window_name.c_str());
+    expect(scale_window && std::fabs(scale_window->Pos.x - 20.0F) < 1.0F &&
+           std::fabs(scale_window->Pos.y - 40.0F) < 1.0F &&
+           std::fabs(scale_window->Size.x - 600.0F) < 1.0F &&
+           std::fabs(scale_window->Size.y - 400.0F) < 1.0F);
+    ImGui::EndFrame();
+
+    layout_tree.setLayoutScale(1.0F);
+    ImGui::NewFrame();
+    layout_tree.draw();
+    scale_window = ImGui::FindWindowByName(scale_window_name.c_str());
+    expect(scale_window && std::fabs(scale_window->Pos.x - 10.0F) < 1.0F &&
+           std::fabs(scale_window->Pos.y - 20.0F) < 1.0F &&
+           std::fabs(scale_window->Size.x - 620.0F) < 1.0F &&
+           std::fabs(scale_window->Size.y - 440.0F) < 1.0F);
+    ImGui::EndFrame();
+
+    layout_tree.setLayoutScale(2.0F);
+    rgui::UiTree moved_layout_tree = std::move(layout_tree);
+    expect(moved_layout_tree.layoutScale() == 2.0F);
+    rgui::UiTree assigned_layout_tree;
+    assigned_layout_tree.setLayoutScale(4.0F);
+    assigned_layout_tree = std::move(moved_layout_tree);
+    expect(assigned_layout_tree.layoutScale() == 2.0F);
+
     ImGui::DestroyContext();
     return failures == 0 ? 0 : 1;
 }

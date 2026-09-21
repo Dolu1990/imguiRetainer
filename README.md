@@ -26,6 +26,20 @@ inner and outer borders. Empty and hidden cells retain their coordinates.
 change the retained tree. `Container::replace()` swaps a direct child in place;
 all structural changes must occur outside `UiTree::draw()`.
 
+## Layout scale
+
+`UiTree` stores caller-supplied fixed dimensions and anchor offsets as scale-1
+logical pixels. Call `setLayoutScale(scale)` before `draw()` to convert the
+fixed window, anchored-panel, scroll-area, and table-column geometry to Dear
+ImGui pixels for that frame; the default scale is `1.0`. `layoutScale()` reads
+the current value. The scale must be finite and greater than zero and cannot
+change while the tree is drawing. Stored geometry and getters remain logical,
+while fill extents, normalized anchors, fitted widths, stretch weights, and
+natural text/button measurements are not scaled.
+
+Custom C++ nodes can use the protected `Node::layoutScale()` helper when
+converting their own logical geometry. Detached nodes report `1.0`.
+
 ## Anchored layout
 
 `AnchoredPanel` stores anchors on behalf of its children, so reusable nodes do
