@@ -83,16 +83,19 @@ Anchor checked_anchor_from_lua(float selfX, float selfY, float targetX, float ta
     return anchor_from_lua(selfX, selfY, targetX, targetY, offsetX, offsetY);
 }
 
-std::pair<float, PanelExtent> panel_extent_from_lua(const sol::object& value) {
+std::pair<float, PanelExtent> panel_extent_from_lua(const sol::object& value, bool allow_automatic = false) {
     if (value.is<float>()) return {value.as<float>(), PanelExtent::fixed};
     if (value.is<std::string>() && value.as<std::string>() == "fill") return {0.0F, PanelExtent::fill};
+    if (allow_automatic && value.is<std::string>() && value.as<std::string>() == "auto") {
+        return {0.0F, PanelExtent::automatic};
+    }
     throw std::invalid_argument("panel extent must be a number or the string 'fill'");
 }
 
 WindowLayout window_layout_from_lua(const sol::object& width, const sol::object& height,
                                     Anchor primary, std::optional<Anchor> secondary = std::nullopt) {
-    const auto [width_value, width_extent] = panel_extent_from_lua(width);
-    const auto [height_value, height_extent] = panel_extent_from_lua(height);
+    const auto [width_value, width_extent] = panel_extent_from_lua(width, true);
+    const auto [height_value, height_extent] = panel_extent_from_lua(height, true);
     return {{width_value, height_value}, width_extent, height_extent, primary, secondary};
 }
 

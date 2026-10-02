@@ -229,6 +229,14 @@ void Window::setScreenLayout(WindowLayout value) {
     validate_size(value.size);
     validate_anchor(value.primary);
     if (value.secondary) validate_anchor(*value.secondary);
+    const bool width_automatic = value.widthExtent == PanelExtent::automatic;
+    const bool height_automatic = value.heightExtent == PanelExtent::automatic;
+    if (width_automatic != height_automatic) {
+        throw std::invalid_argument("rgui window automatic sizing must be used for both dimensions");
+    }
+    if (width_automatic && value.secondary) {
+        throw std::invalid_argument("rgui window automatic sizing cannot use a secondary anchor");
+    }
     screen_layout_ = std::move(value);
 }
 void Window::clearScreenLayout() noexcept { screen_layout_.reset(); }
@@ -241,28 +249,34 @@ void Window::draw() {
     if (screen_layout_) {
         const WindowLayout& layout = *screen_layout_;
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
-        Size size = layout.size;
         const float scale = layoutScale();
-        if (layout.widthExtent == PanelExtent::fill) size.width = viewport->Size.x;
-        else size.width = scale_length(size.width, scale);
-        if (layout.heightExtent == PanelExtent::fill) size.height = viewport->Size.y;
-        else size.height = scale_length(size.height, scale);
-        if (layout.secondary) {
-            const Anchor& secondary = *layout.secondary;
-            const ImVec2 primary_target = point_in_rect(layout.primary.target, {viewport->Size.x, viewport->Size.y});
-            const ImVec2 secondary_target = point_in_rect(secondary.target, {viewport->Size.x, viewport->Size.y});
-            if (const auto width = proposed_axis(primary_target.x + scale_length(layout.primary.offsetX, scale),
-                                                 secondary_target.x + scale_length(secondary.offsetX, scale),
-                                                 layout.primary.self.x, secondary.self.x)) size.width = *width;
-            if (const auto height = proposed_axis(primary_target.y + scale_length(layout.primary.offsetY, scale),
-                                                  secondary_target.y + scale_length(secondary.offsetY, scale),
-                                                  layout.primary.self.y, secondary.self.y)) size.height = *height;
-        }
         const ImVec2 target = point_in_rect(layout.primary.target, {viewport->Size.x, viewport->Size.y});
-        const ImVec2 self = point_in_rect(layout.primary.self, {size.width, size.height});
-        ImGui::SetNextWindowPos({viewport->Pos.x + target.x + scale_length(layout.primary.offsetX, scale) - self.x,
-                                 viewport->Pos.y + target.y + scale_length(layout.primary.offsetY, scale) - self.y}, ImGuiCond_Always);
-        ImGui::SetNextWindowSize({size.width, size.height}, ImGuiCond_Always);
+        const ImVec2 position{viewport->Pos.x + target.x + scale_length(layout.primary.offsetX, scale),
+                              viewport->Pos.y + target.y + scale_length(layout.primary.offsetY, scale)};
+        if (layout.widthExtent == PanelExtent::automatic) {
+            flags |= ImGuiWindowFlags_AlwaysAutoResize;
+            ImGui::SetNextWindowPos(position, ImGuiCond_Always,
+                                    {layout.primary.self.x, layout.primary.self.y});
+        } else {
+            Size size = layout.size;
+            if (layout.widthExtent == PanelExtent::fill) size.width = viewport->Size.x;
+            else size.width = scale_length(size.width, scale);
+            if (layout.heightExtent == PanelExtent::fill) size.height = viewport->Size.y;
+            else size.height = scale_length(size.height, scale);
+            if (layout.secondary) {
+                const Anchor& secondary = *layout.secondary;
+                const ImVec2 secondary_target = point_in_rect(secondary.target, {viewport->Size.x, viewport->Size.y});
+                if (const auto width = proposed_axis(position.x,
+                                                     viewport->Pos.x + secondary_target.x + scale_length(secondary.offsetX, scale),
+                                                     layout.primary.self.x, secondary.self.x)) size.width = *width;
+                if (const auto height = proposed_axis(position.y,
+                                                      viewport->Pos.y + secondary_target.y + scale_length(secondary.offsetY, scale),
+                                                      layout.primary.self.y, secondary.self.y)) size.height = *height;
+            }
+            const ImVec2 self = point_in_rect(layout.primary.self, {size.width, size.height});
+            ImGui::SetNextWindowPos({position.x - self.x, position.y - self.y}, ImGuiCond_Always);
+            ImGui::SetNextWindowSize({size.width, size.height}, ImGuiCond_Always);
+        }
     }
     const std::string title = title_ + "###rgui-" + std::to_string(id());
     const bool draw_contents = ImGui::Begin(title.c_str(), nullptr, flags);
@@ -562,15 +576,22 @@ void validate_size(Size size) {
         throw std::invalid_argument("rgui panel size cannot be negative");
     }
 }
+void validate_panel_extent(PanelExtent extent) {
+    if (extent == PanelExtent::automatic) {
+        throw std::invalid_argument("rgui anchored panel dimensions must be fixed or fill");
+    }
+}
 } // namespace
 
 AnchoredPanel::AnchoredPanel(Size size, PanelExtent widthExtent, PanelExtent heightExtent)
     : size_(size), width_extent_(widthExtent), height_extent_(heightExtent) {
     validate_size(size);
+    validate_panel_extent(widthExtent);
+    validate_panel_extent(heightExtent);
 }
 void AnchoredPanel::setSize(Size size) { validate_size(size); size_ = size; }
-void AnchoredPanel::setWidthExtent(PanelExtent value) noexcept { width_extent_ = value; }
-void AnchoredPanel::setHeightExtent(PanelExtent value) noexcept { height_extent_ = value; }
+void AnchoredPanel::setWidthExtent(PanelExtent value) { validate_panel_extent(value); width_extent_ = value; }
+void AnchoredPanel::setHeightExtent(PanelExtent value) { validate_panel_extent(value); height_extent_ = value; }
 Size AnchoredPanel::measure() const {
     Size result = size_;
     const float scale = layoutScale();

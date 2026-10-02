@@ -94,6 +94,8 @@ int main() {
         overlay:clearScreenLayout()
         overlay:setScreenLayout(100, 50,
             rgui.Anchor("top_left", "top_left"), rgui.Anchor("bottom_right", "bottom_right"))
+        auto_overlay = rgui.window("Auto sized overlay")
+        auto_overlay:setScreenLayout("auto", "auto", rgui.Anchor("center", "center", 12, -8))
         panel:append(label, 0, 0, 0, 0, 12, 12)
         named_anchor = rgui.Anchor("top", "top", 0, 32)
         numeric_anchor = rgui.Anchor(0, 0, 0, 0)
@@ -164,6 +166,16 @@ int main() {
     const sol::protected_function_result invalid_window_extent = lua.safe_script(R"(
         overlay:setScreenLayout("wide", 50, rgui.Anchor("top_left", "top_left"))
     )", sol::script_pass_on_error);
+    const sol::protected_function_result invalid_mixed_auto_window_extent = lua.safe_script(R"(
+        overlay:setScreenLayout("auto", 50, rgui.Anchor("center", "center"))
+    )", sol::script_pass_on_error);
+    const sol::protected_function_result invalid_secondary_auto_window_extent = lua.safe_script(R"(
+        overlay:setScreenLayout("auto", "auto",
+            rgui.Anchor("center", "center"), rgui.Anchor("bottom_right", "bottom_right"))
+    )", sol::script_pass_on_error);
+    const sol::protected_function_result invalid_anchored_panel_auto_extent = lua.safe_script(R"(
+        rgui.anchoredPanel("auto", 100)
+    )", sol::script_pass_on_error);
     const sol::protected_function_result invalid_text_font_scale = lua.safe_script(
         "label:setFontScale(0)", sol::script_pass_on_error);
     const sol::protected_function_result invalid_button_font_scale = lua.safe_script(
@@ -174,6 +186,8 @@ int main() {
         invalid_table_row.valid() || invalid_table_cell_row.valid() ||
         invalid_table_cell_column.valid() || out_of_range_table_cell.valid() || invalid_color.valid() ||
         invalid_window_alpha.valid() || invalid_window_extent.valid() ||
+        invalid_mixed_auto_window_extent.valid() || invalid_secondary_auto_window_extent.valid() ||
+        invalid_anchored_panel_auto_extent.valid() ||
         invalid_text_font_scale.valid() || invalid_button_font_scale.valid()) return 1;
 
     const sol::protected_function_result callback_result = lua.safe_script(R"(
@@ -207,6 +221,7 @@ int main() {
     const std::shared_ptr<rgui::Stack> callback_root = lua["callback_root"];
     const std::shared_ptr<rgui::Selectable> selection = lua["selection"];
     const std::shared_ptr<rgui::Window> overlay = lua["overlay"];
+    const std::shared_ptr<rgui::Window> auto_overlay = lua["auto_overlay"];
     const std::shared_ptr<rgui::Text> clickable_text = lua["clickable_text"];
     const std::shared_ptr<rgui::Button> clickable_button = lua["clickable_button"];
     rgui::UiTree click_tree;
@@ -260,7 +275,13 @@ int main() {
                    replace_old->parent() == nullptr && lua["lua_replaced_id"].get<rgui::NodeId>() == replace_old->id()
                    && overlay->backgroundAlpha() == 0.4F && !overlay->decorated() && !overlay->movable() &&
                    !overlay->resizable() && overlay->screenLayout() &&
-                   overlay->screenLayout()->secondary
+                   overlay->screenLayout()->secondary && auto_overlay->screenLayout() &&
+                   auto_overlay->screenLayout()->widthExtent == rgui::PanelExtent::automatic &&
+                   auto_overlay->screenLayout()->heightExtent == rgui::PanelExtent::automatic &&
+                   auto_overlay->screenLayout()->primary.self == rgui::AnchorPoint{0.5F, 0.5F} &&
+                   auto_overlay->screenLayout()->primary.target == rgui::AnchorPoint{0.5F, 0.5F} &&
+                   auto_overlay->screenLayout()->primary.offsetX == 12.0F &&
+                   auto_overlay->screenLayout()->primary.offsetY == -8.0F
                    && label->fontScale() == 2.0F && action->fontScale() == 2.0F
                    && lua["lua_text_font_scale"].get<float>() == 2.0F
                    && lua["lua_button_font_scale"].get<float>() == 2.0F

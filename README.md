@@ -12,9 +12,11 @@ deferred design decisions.
 ## Current retained API
 
 `Window` can use Dear ImGui's normal placement or an opt-in main-viewport
-layout, with fixed or fill extents and one or two anchors. It also exposes title
-bar, movement, resizing, and background-alpha controls. `ScrollArea` creates a
-fixed-size scrolling child region whose border can be disabled.
+layout, with fixed or fill extents and one or two anchors. A window may instead
+use automatic extents on both axes to size itself to its content while the
+primary anchor positions it. It also exposes title bar, movement, resizing, and
+background-alpha controls. `ScrollArea` creates a fixed-size scrolling child
+region whose border can be disabled.
 
 `Table` has an explicit row/cell model. Columns can be fit-to-content, fixed
 width, or weighted; their contents can be justified horizontally and vertically.
@@ -110,6 +112,15 @@ tracks a resized window:
 ```lua
 local full_width = rgui.anchoredPanel("fill", 100)
 local full_surface = rgui.anchoredPanel("fill", "fill")
+```
+
+For a window that should fit its contents, use `"auto"` for both dimensions.
+The primary anchor positions the auto-sized window as a pivot; automatic
+dimensions cannot be mixed with fixed or fill extents or a secondary anchor:
+
+```lua
+local popup = rgui.window("Choose a map")
+popup:setScreenLayout("auto", "auto", rgui.Anchor("center", "center"))
 ```
 
 ## Requirements

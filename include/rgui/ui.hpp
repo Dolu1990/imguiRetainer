@@ -251,13 +251,15 @@ struct Anchor {
     float offsetY = 0.0F;
 };
 
-/// How an AnchoredPanel resolves one of its dimensions.
-enum class PanelExtent { fixed, fill };
+/// How a layout resolves one of its dimensions. Automatic sizing is supported
+/// by Window; AnchoredPanel dimensions remain fixed or fill.
+enum class PanelExtent { fixed, fill, automatic };
 
 /// Describes an opt-in main-viewport layout for a Window. Fixed dimensions and
 /// anchor offsets are in logical pixels. The primary anchor positions the
 /// window; a secondary anchor may derive its width and/or height when its
-/// corresponding self coordinate differs.
+/// corresponding self coordinate differs. Automatic sizing must be selected
+/// for both dimensions and cannot be combined with a secondary anchor.
 struct WindowLayout {
     Size size{};
     PanelExtent widthExtent = PanelExtent::fixed;
@@ -308,8 +310,8 @@ public:
     void setSize(Size size);
     [[nodiscard]] PanelExtent widthExtent() const noexcept { return width_extent_; }
     [[nodiscard]] PanelExtent heightExtent() const noexcept { return height_extent_; }
-    void setWidthExtent(PanelExtent value) noexcept;
-    void setHeightExtent(PanelExtent value) noexcept;
+    void setWidthExtent(PanelExtent value);
+    void setHeightExtent(PanelExtent value);
     [[nodiscard]] Size measure() const override;
 
     void append(NodePtr child) override;

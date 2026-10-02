@@ -14,7 +14,8 @@ state.
   binding target additionally exposes `<rgui/lua.hpp>`.
 - Retained nodes: `Window`, `Stack`, `Table`, `ScrollArea`, `AnchoredPanel`, `Text`, `Button`, and `Selectable`
 - `Window` supports normal ImGui placement or anchored main-viewport layout,
-  along with decoration, movement, resizing, and background-alpha controls.
+  including fixed, fill, and content-sized extents, along with decoration,
+  movement, resizing, and background-alpha controls.
 - `Table` supports fit, fixed, and weighted columns; per-column alignment;
   headers; row colours; and independently configured inner and outer borders.
 - `Text` and `Button` support font scaling; `Text`, `Button`, and `Selectable` support queued click callbacks.
@@ -92,8 +93,11 @@ returns `1.0` for detached nodes.
 `Window` normally leaves placement to Dear ImGui. Its optional `WindowLayout`
 resolves fixed or fill dimensions against the main viewport on every draw; a
 primary anchor positions the window and a secondary anchor can derive either
-dimension. Window decoration, movement, resizing, and background alpha map to
-the corresponding Dear ImGui window controls.
+dimension. Automatic sizing uses ImGui's always-auto-resize behavior and
+positions the window through the primary anchor as a pivot. Both dimensions
+must be automatic together, and automatic sizing cannot use a secondary
+anchor. Window decoration, movement, resizing, and background alpha map to the
+corresponding Dear ImGui window controls.
 
 Button, text, and selectable nodes derive their Dear ImGui item identity from
 their immutable node ID rather than their displayed text. Changing a label or

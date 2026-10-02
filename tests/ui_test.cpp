@@ -219,6 +219,24 @@ int main() {
     try { overlay.setBackgroundAlpha(1.1F); } catch (const std::invalid_argument&) { rejected_window_alpha = true; }
     expect(rejected_window_alpha && overlay.backgroundAlpha() == 0.4F && !overlay.decorated() &&
            !overlay.movable() && !overlay.resizable());
+    rgui::WindowLayout mixed_auto_layout{{0.0F, 100.0F}, rgui::PanelExtent::automatic,
+                                         rgui::PanelExtent::fixed, {{0.5F, 0.5F}, {0.5F, 0.5F}}};
+    bool rejected_mixed_auto_layout = false;
+    try { overlay.setScreenLayout(mixed_auto_layout); }
+    catch (const std::invalid_argument&) { rejected_mixed_auto_layout = true; }
+    rgui::WindowLayout secondary_auto_layout{{0.0F, 0.0F}, rgui::PanelExtent::automatic,
+                                             rgui::PanelExtent::automatic, {{0.0F, 0.0F}, {0.0F, 0.0F}}};
+    secondary_auto_layout.secondary = rgui::Anchor{{1.0F, 1.0F}, {1.0F, 1.0F}};
+    bool rejected_secondary_auto_layout = false;
+    try { overlay.setScreenLayout(secondary_auto_layout); }
+    catch (const std::invalid_argument&) { rejected_secondary_auto_layout = true; }
+    bool rejected_auto_anchored_panel = false;
+    try {
+        rgui::AnchoredPanel invalid_auto_panel({100.0F, 50.0F}, rgui::PanelExtent::automatic,
+                                               rgui::PanelExtent::fixed);
+    } catch (const std::invalid_argument&) { rejected_auto_anchored_panel = true; }
+    expect(rejected_mixed_auto_layout && rejected_secondary_auto_layout && rejected_auto_anchored_panel &&
+           !overlay.screenLayout());
 
     bool activated = false;
     first->setOnClick([&activated](rgui::Node&) { activated = true; });
@@ -805,6 +823,49 @@ int main() {
     expect(std::fabs(overlay_window->Size.x - 640.0F) < 1.0F && std::fabs(overlay_window->Size.y - 480.0F) < 1.0F);
     overlay.clearScreenLayout();
     expect(!overlay.screenLayout());
+    ImGui::EndFrame();
+
+    auto auto_size_window = std::make_shared<rgui::Window>("auto size window");
+    auto_size_window->setMovable(false);
+    auto_size_window->setResizable(false);
+    auto auto_size_text = std::make_shared<rgui::Text>("short content");
+    auto_size_window->append(auto_size_text);
+    auto_size_window->setScreenLayout({{0.0F, 0.0F}, rgui::PanelExtent::automatic,
+                                       rgui::PanelExtent::automatic,
+                                       {{0.5F, 0.5F}, {0.5F, 0.5F}, 10.0F, -5.0F}});
+    const std::string auto_size_window_name = "auto size window###rgui-" +
+                                              std::to_string(auto_size_window->id());
+    ImGui::NewFrame();
+    auto_size_window->draw();
+    ImGuiWindow* auto_size_imgui_window = ImGui::FindWindowByName(auto_size_window_name.c_str());
+    const ImGuiViewport* auto_size_viewport = ImGui::GetMainViewport();
+    expect(auto_size_imgui_window &&
+           (auto_size_imgui_window->Flags & ImGuiWindowFlags_AlwaysAutoResize) != 0);
+    ImGui::EndFrame();
+    ImGui::NewFrame();
+    auto_size_window->draw();
+    auto_size_imgui_window = ImGui::FindWindowByName(auto_size_window_name.c_str());
+    expect(auto_size_imgui_window &&
+           std::fabs(auto_size_imgui_window->Pos.x + auto_size_imgui_window->Size.x * 0.5F -
+                     (auto_size_viewport->Pos.x + auto_size_viewport->Size.x * 0.5F + 10.0F)) < 1.0F &&
+           std::fabs(auto_size_imgui_window->Pos.y + auto_size_imgui_window->Size.y * 0.5F -
+                     (auto_size_viewport->Pos.y + auto_size_viewport->Size.y * 0.5F - 5.0F)) < 1.0F);
+    const ImVec2 short_auto_size = auto_size_imgui_window ? auto_size_imgui_window->Size : ImVec2{};
+    ImGui::EndFrame();
+    auto_size_text->setValue("content that is long enough to resize this window automatically");
+    ImGui::NewFrame();
+    auto_size_window->draw();
+    auto_size_imgui_window = ImGui::FindWindowByName(auto_size_window_name.c_str());
+    expect(auto_size_imgui_window);
+    ImGui::EndFrame();
+    ImGui::NewFrame();
+    auto_size_window->draw();
+    auto_size_imgui_window = ImGui::FindWindowByName(auto_size_window_name.c_str());
+    expect(auto_size_imgui_window && auto_size_imgui_window->Size.x > short_auto_size.x + 40.0F &&
+           std::fabs(auto_size_imgui_window->Pos.x + auto_size_imgui_window->Size.x * 0.5F -
+                     (auto_size_viewport->Pos.x + auto_size_viewport->Size.x * 0.5F + 10.0F)) < 1.0F &&
+           std::fabs(auto_size_imgui_window->Pos.y + auto_size_imgui_window->Size.y * 0.5F -
+                     (auto_size_viewport->Pos.y + auto_size_viewport->Size.y * 0.5F - 5.0F)) < 1.0F);
     ImGui::EndFrame();
 
     rgui::UiTree layout_tree;
