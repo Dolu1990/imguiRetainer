@@ -47,6 +47,7 @@ private:
 class Container;
 class Table;
 class Button;
+class Selectable;
 class Node;
 class UiTree;
 using NodePtr = std::shared_ptr<Node>;
@@ -87,6 +88,7 @@ private:
     friend class Container;
     friend class Table;
     friend class Button;
+    friend class Selectable;
     friend class Text;
     friend class UiTree;
     virtual void set_tree_recursive(UiTree* tree) noexcept;
@@ -210,18 +212,21 @@ private:
     bool outer_vertical_borders_ = true;
 };
 
-/// Draws children in a bordered fixed-size region. The fixed size is in
-/// logical pixels; Dear ImGui adds scrollbars when the children's contents
-/// overflow the scaled region.
+/// Draws children in a fixed-size region with a border by default. The fixed
+/// size is in logical pixels; Dear ImGui adds scrollbars when the children's
+/// contents overflow the scaled region.
 class ScrollArea final : public Container {
 public:
     explicit ScrollArea(Size size);
     [[nodiscard]] Size size() const noexcept { return size_; }
     void setSize(Size size);
+    [[nodiscard]] bool bordered() const noexcept { return bordered_; }
+    void setBordered(bool value) noexcept;
     void draw() override;
 
 private:
     Size size_;
+    bool bordered_ = true;
 };
 
 /// A normalized point within a rectangle. `{0.0F, 0.0F}` is its top-left
@@ -366,6 +371,26 @@ private:
     std::function<void(Node&)> on_click_;
 };
 
+/// A retained item drawn with Dear ImGui's default Selectable sizing and flags.
+/// Selection state is supplied by the owner and is not changed automatically
+/// when the item is clicked.
+class Selectable final : public Node {
+public:
+    explicit Selectable(std::string label = {});
+    [[nodiscard]] std::string_view label() const noexcept { return label_; }
+    void setLabel(std::string_view value);
+    [[nodiscard]] bool selected() const noexcept { return selected_; }
+    void setSelected(bool value) noexcept;
+    void setOnClick(std::function<void(Node&)> callback);
+    void activate();
+    [[nodiscard]] Size measure() const override;
+    void draw() override;
+private:
+    std::string label_;
+    bool selected_ = false;
+    std::function<void(Node&)> on_click_;
+};
+
 /// Owns one root and draws it into the caller-owned current Dear ImGui frame.
 class UiTree final {
 public:
@@ -389,6 +414,7 @@ public:
     [[nodiscard]] std::size_t pendingEventCount() const noexcept { return events_.size(); }
 private:
     friend class Button;
+    friend class Selectable;
     friend class Container;
     friend class Table;
     friend class Text;

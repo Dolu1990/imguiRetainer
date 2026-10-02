@@ -14,14 +14,16 @@ deferred design decisions.
 `Window` can use Dear ImGui's normal placement or an opt-in main-viewport
 layout, with fixed or fill extents and one or two anchors. It also exposes title
 bar, movement, resizing, and background-alpha controls. `ScrollArea` creates a
-fixed-size scrolling child region.
+fixed-size scrolling child region whose border can be disabled.
 
 `Table` has an explicit row/cell model. Columns can be fit-to-content, fixed
 width, or weighted; their contents can be justified horizontally and vertically.
 Tables also support headers, per-row colours, and independently configurable
 inner and outer borders. Empty and hidden cells retain their coordinates.
 
-`Text` and `Button` support font scaling and queued click callbacks. Call
+`Text` and `Button` support font scaling; `Text`, `Button`, and `Selectable`
+support queued click callbacks. A selectable exposes caller-owned selected
+state and uses Dear ImGui's default sizing and flags. Call
 `UiTree::flushEvents()` after drawing, at a point where callbacks may safely
 change the retained tree. `Container::replace()` swaps a direct child in place;
 all structural changes must occur outside `UiTree::draw()`.
@@ -35,7 +37,7 @@ ImGui pixels for that frame; the default scale is `1.0`. `layoutScale()` reads
 the current value. The scale must be finite and greater than zero and cannot
 change while the tree is drawing. Stored geometry and getters remain logical,
 while fill extents, normalized anchors, fitted widths, stretch weights, and
-natural text/button measurements are not scaled.
+natural text/button/selectable measurements are not scaled.
 
 Custom C++ nodes can use the protected `Node::layoutScale()` helper when
 converting their own logical geometry. Detached nodes report `1.0`.
@@ -77,6 +79,23 @@ panel:append(rgui.button("Continue"), rgui.Anchor(0.5, 0, 0.5, 0, 0, 32))
 panel:append(rgui.button("Stretch"),
     rgui.Anchor("top_left", "top_left", 12, 64),
     rgui.Anchor("top_right", "top_right", -12, 64))
+```
+
+Use a `ScrollArea` to group selectable items in a scrolling child region. The
+scenario owns selection changes and can use the item's label in its callback:
+
+```lua
+local window = rgui.window("Select map")
+local map_list = rgui.scrollArea(320, 180)
+map_list.bordered = false
+local map_item = rgui.selectable("Belt")
+map_item.selected = true
+map_item:onClick(function(item)
+    selected_map = item.label
+    item.selected = true
+end)
+map_list:append(map_item)
+window:append(map_list)
 ```
 
 Anchor coordinates can be adjusted through `selfX`, `selfY`, `targetX`,

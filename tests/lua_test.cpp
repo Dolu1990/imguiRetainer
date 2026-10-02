@@ -25,6 +25,8 @@ int main() {
         lua_button_font_scale = action:fontScale()
         stats = rgui.table(2)
         log = rgui.scrollArea(240, 80)
+        lua_scroll_bordered_default = log.bordered
+        log.bordered = false
         stats:setHeader(1, "Stat")
         stats:setHeader(2, "Value")
         stats:setColumnFit(1)
@@ -76,6 +78,7 @@ int main() {
         all_nodes:append(rgui.anchoredPanel(100, 50))
         all_nodes:append(rgui.text("Text"))
         all_nodes:append(rgui.button("Button"))
+        all_nodes:append(rgui.selectable("Selectable"))
         replace_parent = rgui.stack("vertical")
         replace_old = rgui.text("old")
         replace_new = rgui.table(1)
@@ -110,10 +113,17 @@ int main() {
         callback_root = rgui.stack("vertical")
         clickable_text = rgui.text("Clickable text")
         clickable_button = rgui.button("Clickable button")
+        selection = rgui.selectable("Map One")
+        selection.selected = true
         clickable_text:onClick(function(node) text_callback_value = node.value end)
         clickable_button:onClick(function(node) button_callback_label = node.label end)
+        selection:onClick(function(node)
+            selectable_callback_label = node.label
+            node.selected = false
+        end)
         callback_root:append(clickable_text)
         callback_root:append(clickable_button)
+        callback_root:append(selection)
     )", sol::script_pass_on_error);
     if (!result.valid()) {
         const sol::error error = result;
@@ -195,6 +205,7 @@ int main() {
     const std::optional<rgui::Anchor>& stretched_second_anchor = panel->secondAnchor(*stretched);
     const std::shared_ptr<rgui::Button> failing_button = lua["failing_button"];
     const std::shared_ptr<rgui::Stack> callback_root = lua["callback_root"];
+    const std::shared_ptr<rgui::Selectable> selection = lua["selection"];
     const std::shared_ptr<rgui::Window> overlay = lua["overlay"];
     const std::shared_ptr<rgui::Text> clickable_text = lua["clickable_text"];
     const std::shared_ptr<rgui::Button> clickable_button = lua["clickable_button"];
@@ -202,9 +213,11 @@ int main() {
     click_tree.setRoot(callback_root);
     clickable_text->activate();
     clickable_button->activate();
-    const bool lua_click_callbacks_work = click_tree.flushEvents() == 2 &&
+    selection->activate();
+    const bool lua_click_callbacks_work = click_tree.flushEvents() == 3 &&
         lua["text_callback_value"].get<std::string>() == "Clickable text" &&
-        lua["button_callback_label"].get<std::string>() == "Clickable button";
+        lua["button_callback_label"].get<std::string>() == "Clickable button" &&
+        lua["selectable_callback_label"].get<std::string>() == "Map One" && !selection->selected();
     rgui::UiTree callback_tree;
     callback_tree.setRoot(failing_button);
     failing_button->activate();
@@ -240,8 +253,9 @@ int main() {
                    && row_color == rgui::Color{1.0F, 0.0F, 0.0F, 1.0F} && !stats->rowColor(1)
                    && stats->innerHorizontalBorders() && stats->outerHorizontalBorders()
                    && !stats->innerVerticalBorders() && !stats->outerVerticalBorders()
-                   && log->size().width == 240.0F && log->size().height == 80.0F
-                   && all_nodes->children().size() == 7
+                   && log->size().width == 240.0F && log->size().height == 80.0F && !log->bordered()
+                   && lua["lua_scroll_bordered_default"].get<bool>()
+                   && all_nodes->children().size() == 8
                    && replace_parent->children().size() == 1 && replace_parent->children().front() == replace_new &&
                    replace_old->parent() == nullptr && lua["lua_replaced_id"].get<rgui::NodeId>() == replace_old->id()
                    && overlay->backgroundAlpha() == 0.4F && !overlay->decorated() && !overlay->movable() &&

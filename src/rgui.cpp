@@ -510,11 +510,13 @@ void ScrollArea::setSize(Size size) {
     }
     size_ = size;
 }
+void ScrollArea::setBordered(bool value) noexcept { bordered_ = value; }
 void ScrollArea::draw() {
     const std::string area_id = "##rgui-scroll-area-" + std::to_string(id());
     const Size physical_size = scale_size(size_, layoutScale());
+    const ImGuiChildFlags child_flags = bordered_ ? ImGuiChildFlags_Borders : ImGuiChildFlags_None;
     const bool draw_contents = ImGui::BeginChild(area_id.c_str(), {physical_size.width, physical_size.height},
-                                                 ImGuiChildFlags_Borders);
+                                                 child_flags);
     if (draw_contents) draw_children();
     ImGui::EndChild();
 }
@@ -697,6 +699,28 @@ void Button::draw(Size resolved_size) {
     if (!enabled()) ImGui::BeginDisabled();
     const std::string stable_label = label_ + "###rgui-" + node_id_string(id_);
     const bool clicked = ImGui::Button(stable_label.c_str(), {resolved_size.width, resolved_size.height});
+    if (!enabled()) ImGui::EndDisabled();
+    if (clicked && enabled()) activate();
+}
+
+Selectable::Selectable(std::string label) : label_(std::move(label)) {}
+void Selectable::setLabel(std::string_view value) { label_ = value; }
+void Selectable::setSelected(bool value) noexcept { selected_ = value; }
+void Selectable::setOnClick(std::function<void(Node&)> callback) { on_click_ = std::move(callback); }
+void Selectable::activate() {
+    if (visible() && enabled() && on_click_ && tree_) {
+        tree_->enqueue_event(weak_from_this(), attachment_generation_, on_click_);
+    }
+}
+Size Selectable::measure() const {
+    const ImVec2 text_size = ImGui::CalcTextSize(label_.c_str(), nullptr, true);
+    const ImVec2 padding = ImGui::GetStyle().FramePadding;
+    return {text_size.x + padding.x * 2.0F, text_size.y + padding.y * 2.0F};
+}
+void Selectable::draw() {
+    if (!enabled()) ImGui::BeginDisabled();
+    const std::string stable_label = label_ + "###rgui-selectable-" + node_id_string(id_);
+    const bool clicked = ImGui::Selectable(stable_label.c_str(), selected_);
     if (!enabled()) ImGui::EndDisabled();
     if (clicked && enabled()) activate();
 }

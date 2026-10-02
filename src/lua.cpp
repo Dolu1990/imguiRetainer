@@ -108,6 +108,9 @@ sol::object node_to_lua(sol::function& callback, Node& node) {
     if (auto* button = dynamic_cast<Button*>(&node)) {
         return sol::make_object(callback.lua_state(), std::ref(*button));
     }
+    if (auto* selectable = dynamic_cast<Selectable*>(&node)) {
+        return sol::make_object(callback.lua_state(), std::ref(*selectable));
+    }
     return sol::make_object(callback.lua_state(), std::ref(node));
 }
 
@@ -331,7 +334,10 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
         sol::base_classes, sol::bases<Container, Node>(),
         "setSize", [locked](ScrollArea& area, float width, float height) {
             locked([&] { area.setSize(Size{width, height}); });
-        });
+        },
+        "bordered", sol::property(
+            [locked](const ScrollArea& area) { return locked([&] { return area.bordered(); }); },
+            [locked](ScrollArea& area, bool value) { locked([&] { area.setBordered(value); }); }));
     state.new_usertype<AnchoredPanel>("rgui.AnchoredPanel", sol::no_constructor,
         sol::base_classes, sol::bases<Container, Node>(),
         "append", sol::overload(
@@ -426,6 +432,25 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
             });
         },
         "activate", [locked](Button& button) { locked([&] { button.activate(); }); });
+    state.new_usertype<Selectable>("rgui.Selectable", sol::no_constructor,
+        sol::base_classes, sol::bases<Node>(),
+        "label", sol::property(
+            [locked](const Selectable& selectable) { return locked([&] { return std::string(selectable.label()); }); },
+            [locked](Selectable& selectable, const std::string& value) { locked([&] { selectable.setLabel(value); }); }),
+        "selected", sol::property(
+            [locked](const Selectable& selectable) { return locked([&] { return selectable.selected(); }); },
+            [locked](Selectable& selectable, bool value) { locked([&] { selectable.setSelected(value); }); }),
+        "onClick", [locked, callbackExecute](Selectable& selectable, sol::function callback) {
+            auto luaCallback = std::make_shared<LuaNodeCallback>(
+                LuaNodeCallback{std::move(callback), callbackExecute});
+            locked([&] {
+                selectable.setOnClick([luaCallback](Node& node) {
+                    std::vector<sol::object> args{node_to_lua(luaCallback->function, node)};
+                    luaCallback->execute(luaCallback->function, args);
+                });
+            });
+        },
+        "activate", [locked](Selectable& selectable) { locked([&] { selectable.activate(); }); });
     state.new_usertype<UiTree>("rgui.UiTree", sol::constructors<UiTree()>(),
         "setRoot", [locked](UiTree& tree, Node& root) {
             locked([&] { tree.setRoot(root.shared_from_this()); });
@@ -457,6 +482,9 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
     });
     api.set_function("button", [locked](const std::string& label) {
         return locked([&] { return std::make_shared<Button>(label); });
+    });
+    api.set_function("selectable", [locked](const std::string& label) {
+        return locked([&] { return std::make_shared<Selectable>(label); });
     });
     api.set_function("tree", [locked] { return locked([] { return UiTree{}; }); });
 }

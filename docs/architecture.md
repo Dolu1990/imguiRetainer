@@ -12,12 +12,14 @@ state.
 - Public target: `rgui::rgui`
 - Core public headers: `<rgui/rgui.hpp>` and `<rgui/ui.hpp>`; the optional
   binding target additionally exposes `<rgui/lua.hpp>`.
-- Retained nodes: `Window`, `Stack`, `Table`, `ScrollArea`, `AnchoredPanel`, `Text`, and `Button`
+- Retained nodes: `Window`, `Stack`, `Table`, `ScrollArea`, `AnchoredPanel`, `Text`, `Button`, and `Selectable`
 - `Window` supports normal ImGui placement or anchored main-viewport layout,
   along with decoration, movement, resizing, and background-alpha controls.
 - `Table` supports fit, fixed, and weighted columns; per-column alignment;
   headers; row colours; and independently configured inner and outer borders.
-- `Text` and `Button` support font scaling and queued click callbacks.
+- `Text` and `Button` support font scaling; `Text`, `Button`, and `Selectable` support queued click callbacks.
+- `Selectable` uses Dear ImGui's default sizing and flags; its selected state is owned by the caller.
+- `ScrollArea` uses Dear ImGui child flags to optionally show its border, which defaults to enabled.
 - `UiTree` optionally converts fixed layout geometry from scale-1 logical
   pixels to Dear ImGui pixels for each draw; the default scale is `1.0`.
 - `Container::replace()` swaps a direct child in place.
@@ -93,12 +95,13 @@ primary anchor positions the window and a secondary anchor can derive either
 dimension. Window decoration, movement, resizing, and background alpha map to
 the corresponding Dear ImGui window controls.
 
-Button and text nodes derive their Dear ImGui item identity from their immutable
-node ID rather than their displayed text. Changing a button label or text value
-therefore does not interrupt Dear ImGui interaction state. Click callbacks are
-queued and must be delivered by `UiTree::flushEvents()` at an
-application-selected safe point. A queued callback is discarded when its target
-is detached, reattached to another tree, or destroyed before dispatch.
+Button, text, and selectable nodes derive their Dear ImGui item identity from
+their immutable node ID rather than their displayed text. Changing a label or
+text value therefore does not interrupt Dear ImGui interaction state. A
+selectable's selected state remains caller-owned. Click callbacks are queued and
+must be delivered by `UiTree::flushEvents()` at an application-selected safe
+point. A queued callback is discarded when its target is detached, reattached
+to another tree, or destroyed before dispatch.
 Callback errors, including Lua errors, propagate from `flushEvents()` to the
 embedding application. Structural changes, including container edits and table
 row/cell edits, are not permitted while `UiTree::draw()` is running.

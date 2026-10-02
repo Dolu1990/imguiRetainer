@@ -73,13 +73,16 @@ class ScrollRecordingNode final : public rgui::Node {
 public:
     void draw() override {
         window_size_ = ImGui::GetWindowSize();
+        child_flags_ = ImGui::GetCurrentWindow()->ChildFlags;
         for (int index = 0; index < 20; ++index) ImGui::TextUnformatted("scrollable content");
         scroll_max_y_ = ImGui::GetScrollMaxY();
     }
     [[nodiscard]] ImVec2 window_size() const noexcept { return window_size_; }
+    [[nodiscard]] ImGuiChildFlags child_flags() const noexcept { return child_flags_; }
     [[nodiscard]] float scroll_max_y() const noexcept { return scroll_max_y_; }
 private:
     ImVec2 window_size_{};
+    ImGuiChildFlags child_flags_ = ImGuiChildFlags_None;
     float scroll_max_y_ = 0.0F;
 };
 
@@ -252,6 +255,27 @@ int main() {
     clickable_text->activate();
     expect(tree.flushEvents() == 0);
     clickable_text->setEnabled(true);
+
+    auto selectable = std::make_shared<rgui::Selectable>("Map A");
+    root->append(selectable);
+    expect(selectable->label() == "Map A" && !selectable->selected());
+    selectable->setSelected(true);
+    expect(selectable->selected());
+    selectable->setSelected(false);
+    bool selectable_callback_called = false;
+    rgui::Node* selectable_callback_target = nullptr;
+    selectable->setOnClick([&](rgui::Node& node) {
+        selectable_callback_called = true;
+        selectable_callback_target = &node;
+    });
+    selectable->activate();
+    expect(!selectable_callback_called && tree.flushEvents() == 1 && selectable_callback_called &&
+           selectable_callback_target == selectable.get() && !selectable->selected());
+    selectable->setEnabled(false);
+    selectable_callback_called = false;
+    selectable->activate();
+    expect(tree.flushEvents() == 0 && !selectable_callback_called);
+    selectable->setEnabled(true);
 
     bool text_snapshot_callback = false;
     clickable_text->setOnClick([&text_snapshot_callback](rgui::Node&) {
@@ -539,13 +563,19 @@ int main() {
     auto stable_id_root = std::make_shared<rgui::Window>("stable id test root");
     auto stable_id_button = std::make_shared<rgui::Button>("before");
     auto stable_id_text = std::make_shared<rgui::Text>("text before");
+    auto stable_id_selectable = std::make_shared<rgui::Selectable>("selectable before");
     stable_id_root->append(stable_id_button);
     stable_id_root->append(stable_id_text);
+    stable_id_root->append(stable_id_selectable);
     rgui::UiTree stable_id_tree;
     stable_id_tree.setRoot(stable_id_root);
     bool stable_id_button_clicked = false;
     stable_id_button->setOnClick([&stable_id_button_clicked](rgui::Node&) {
         stable_id_button_clicked = true;
+    });
+    bool stable_id_selectable_clicked = false;
+    stable_id_selectable->setOnClick([&stable_id_selectable_clicked](rgui::Node&) {
+        stable_id_selectable_clicked = true;
     });
 
     ImGui::SetNextWindowPos({0.0F, 0.0F}, ImGuiCond_Always);
@@ -557,11 +587,16 @@ int main() {
     const ImVec2 button_max = ImGui::GetItemRectMax();
     stable_id_text->draw();
     const ImGuiID text_id_before = ImGui::GetItemID();
+    stable_id_selectable->draw();
+    const ImGuiID selectable_id_before = ImGui::GetItemID();
+    const ImVec2 selectable_min = ImGui::GetItemRectMin();
+    const ImVec2 selectable_max = ImGui::GetItemRectMax();
     ImGui::End();
     ImGui::EndFrame();
 
     stable_id_button->setLabel("after");
     stable_id_text->setValue("text after");
+    stable_id_selectable->setLabel("selectable after");
     ImGui::NewFrame();
     ImGui::SetNextWindowPos({0.0F, 0.0F}, ImGuiCond_Always);
     ImGui::SetNextWindowSize({300.0F, 200.0F}, ImGuiCond_Always);
@@ -570,10 +605,13 @@ int main() {
     const ImGuiID button_id_after = ImGui::GetItemID();
     stable_id_text->draw();
     const ImGuiID text_id_after = ImGui::GetItemID();
+    stable_id_selectable->draw();
+    const ImGuiID selectable_id_after = ImGui::GetItemID();
     ImGui::End();
     ImGui::EndFrame();
     expect(button_id_before == button_id_after && text_id_before == text_id_after &&
-           button_id_before != 0 && text_id_before != 0);
+           selectable_id_before == selectable_id_after && button_id_before != 0 && text_id_before != 0 &&
+           selectable_id_before != 0);
 
     ImGui::GetIO().MousePos = {(button_min.x + button_max.x) * 0.5F,
                                (button_min.y + button_max.y) * 0.5F};
@@ -595,6 +633,57 @@ int main() {
     ImGui::End();
     ImGui::EndFrame();
     expect(stable_id_tree.flushEvents() == 1 && stable_id_button_clicked);
+
+    ImGui::GetIO().MousePos = {(selectable_min.x + selectable_max.x) * 0.5F,
+                               (selectable_min.y + selectable_max.y) * 0.5F};
+    ImGui::GetIO().MouseDown[ImGuiMouseButton_Left] = true;
+    ImGui::NewFrame();
+    ImGui::SetNextWindowPos({0.0F, 0.0F}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({300.0F, 200.0F}, ImGuiCond_Always);
+    ImGui::Begin("stable widget identity");
+    stable_id_button->draw();
+    stable_id_text->draw();
+    stable_id_selectable->draw();
+    ImGui::End();
+    ImGui::EndFrame();
+
+    ImGui::GetIO().MouseDown[ImGuiMouseButton_Left] = false;
+    ImGui::NewFrame();
+    ImGui::SetNextWindowPos({0.0F, 0.0F}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({300.0F, 200.0F}, ImGuiCond_Always);
+    ImGui::Begin("stable widget identity");
+    stable_id_button->draw();
+    stable_id_text->draw();
+    stable_id_selectable->draw();
+    ImGui::End();
+    ImGui::EndFrame();
+    expect(stable_id_tree.flushEvents() == 1 && stable_id_selectable_clicked &&
+           !stable_id_selectable->selected());
+
+    stable_id_selectable->setEnabled(false);
+    ImGui::GetIO().MouseDown[ImGuiMouseButton_Left] = true;
+    ImGui::NewFrame();
+    ImGui::SetNextWindowPos({0.0F, 0.0F}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({300.0F, 200.0F}, ImGuiCond_Always);
+    ImGui::Begin("stable widget identity");
+    stable_id_button->draw();
+    stable_id_text->draw();
+    stable_id_selectable->draw();
+    ImGui::End();
+    ImGui::EndFrame();
+
+    ImGui::GetIO().MouseDown[ImGuiMouseButton_Left] = false;
+    ImGui::NewFrame();
+    ImGui::SetNextWindowPos({0.0F, 0.0F}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({300.0F, 200.0F}, ImGuiCond_Always);
+    ImGui::Begin("stable widget identity");
+    stable_id_button->draw();
+    stable_id_text->draw();
+    stable_id_selectable->draw();
+    ImGui::End();
+    ImGui::EndFrame();
+    expect(stable_id_tree.flushEvents() == 0 && stable_id_selectable_clicked);
+    stable_id_selectable->setEnabled(true);
 
     ImGui::GetIO().MousePos = {-1000.0F, -1000.0F};
     ImGui::NewFrame();
@@ -658,6 +747,8 @@ int main() {
     ImGui::Begin("scroll area test");
     scrollArea->draw();
     ImGui::End();
+    expect(scrollArea->bordered() &&
+           (scroll_contents->child_flags() & ImGuiChildFlags_Borders) != 0);
     ImGui::SetNextWindowSize({500.0F, 200.0F}, ImGuiCond_Always);
     ImGui::Begin("score table test");
     score_table->draw();
@@ -698,10 +789,14 @@ int main() {
     overlay.setScreenLayout(stretched_layout);
     overlay.draw();
     expect(std::fabs(overlay_window->Size.x - 640.0F) < 1.0F && std::fabs(overlay_window->Size.y - 480.0F) < 1.0F);
+    scrollArea->setBordered(false);
     ImGui::Begin("scroll area test");
     scrollArea->draw();
     ImGui::End();
-    expect(scroll_contents->scroll_max_y() > 0.0F);
+    expect(!scrollArea->bordered() &&
+           (scroll_contents->child_flags() & ImGuiChildFlags_Borders) == 0 &&
+           scroll_contents->scroll_max_y() > 0.0F);
+    scrollArea->setBordered(true);
     ImGui::EndFrame();
     ImGui::NewFrame();
     overlay.setScreenLayout({{0.0F, 0.0F}, rgui::PanelExtent::fill, rgui::PanelExtent::fill,
