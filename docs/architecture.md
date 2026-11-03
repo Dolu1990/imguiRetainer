@@ -12,7 +12,7 @@ state.
 - Public target: `rgui::rgui`
 - Core public headers: `<rgui/rgui.hpp>` and `<rgui/ui.hpp>`; the optional
   binding target additionally exposes `<rgui/lua.hpp>`.
-- Retained nodes: `Window`, `Stack`, `Table`, `ScrollArea`, `AnchoredPanel`, `Text`, `Button`, and `Selectable`
+- Retained nodes: `Window`, `Stack`, `Table`, `ScrollArea`, `AnchoredPanel`, `Text`, `Button`, `SliderInt`, and `Selectable`
 - `Window` supports normal ImGui placement or anchored main-viewport layout,
   including fixed, fill, and content-sized extents, along with decoration,
   movement, resizing, and background-alpha controls.
@@ -64,7 +64,10 @@ owns each child's anchor metadata. A primary anchor positions the child; an
 optional secondary anchor derives a non-binding `SizeProposal` on each axis
 where the two child anchor points differ. The child accepts, adjusts, or
 ignores the proposal through `measure(SizeProposal)`, then is drawn with its
-accepted size. Its dimensions can be fixed or fill either available ImGui
+accepted size. `ScrollArea` accepts proposed width and height for bounded,
+independently scrolling anchored regions; resolved dimensions are already in
+physical pixels and are not scaled twice. The panel's dimensions can be fixed
+or fill either available ImGui
 content axis. A real overlay, table, popup, or other composite should be a
 specialized node that expresses ImGui's own begin/end protocol directly.
 `Table` is the first such composite: it derives directly from `Node`, owns a
@@ -109,6 +112,12 @@ to another tree, or destroyed before dispatch.
 Callback errors, including Lua errors, propagate from `flushEvents()` to the
 embedding application. Structural changes, including container edits and table
 row/cell edits, are not permitted while `UiTree::draw()` is running.
+
+`SliderInt` provides bounded integer editing with a visible numeric value. Its
+range is immutable and limited to ImGui's signed half-range bounds. Programmatic
+value assignment clamps without emitting an event. User changes queue the value
+at the time of interaction through the same attachment-aware event mechanism;
+Lua `onChange(callback)` receives that integer at the embedding's safe point.
 
 `bindLua` receives an embedding-owned `std::recursive_mutex`. It serializes all
 Lua-exposed rgui object access with the embedding application's draw and event

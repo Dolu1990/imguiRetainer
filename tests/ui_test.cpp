@@ -816,6 +816,26 @@ int main() {
            scroll_contents->scroll_max_y() > 0.0F);
     scrollArea->setBordered(true);
     ImGui::EndFrame();
+
+    // A scrollable roster accepts both anchor-derived dimensions, in physical
+    // pixels, rather than expanding to the rest of the parent window.
+    auto anchored_scroll = std::make_shared<rgui::ScrollArea>(rgui::Size{0.0F, 0.0F});
+    auto anchored_contents = std::make_shared<ScrollRecordingNode>();
+    anchored_scroll->append(anchored_contents);
+    rgui::AnchoredPanel roster_panel({400.0F, 240.0F});
+    roster_panel.append(anchored_scroll, {{0.0F, 0.0F}, {0.0F, 0.0F}},
+                        {{1.0F, 1.0F}, {0.5F, 0.5F}});
+    for (int frame = 0; frame < 2; ++frame) {
+        ImGui::NewFrame();
+        ImGui::SetNextWindowSize({500.0F, 360.0F});
+        ImGui::Begin("anchored roster test");
+        roster_panel.draw();
+        ImGui::End();
+        expect(std::fabs(anchored_contents->window_size().x - 200.0F) < 1.0F &&
+               std::fabs(anchored_contents->window_size().y - 120.0F) < 1.0F);
+        ImGui::EndFrame();
+    }
+    expect(anchored_contents->scroll_max_y() > 0.0F);
     ImGui::NewFrame();
     overlay.setScreenLayout({{0.0F, 0.0F}, rgui::PanelExtent::fill, rgui::PanelExtent::fill,
                              {{0.0F, 0.0F}, {0.0F, 0.0F}}});
@@ -1014,6 +1034,54 @@ int main() {
     assigned_layout_tree.setLayoutScale(4.0F);
     assigned_layout_tree = std::move(moved_layout_tree);
     expect(assigned_layout_tree.layoutScale() == 2.0F);
+
+    // Integer editing queues the interaction-time value, never a callback from
+    // programmatic assignment; detaching before dispatch cancels stale edits.
+    auto contribution = std::make_shared<rgui::SliderInt>(20, 0, 100);
+    rgui::UiTree slider_tree;
+    slider_tree.setRoot(contribution);
+    int edited = -1;
+    contribution->setOnChange([&edited](int value) { edited = value; });
+    contribution->setValue(200);
+    expect(contribution->value() == 100 && slider_tree.pendingEventCount() == 0);
+    contribution->setValue(-1);
+    expect(contribution->value() == 0 && slider_tree.pendingEventCount() == 0);
+    for (const auto range : {std::pair{5, 4}, std::pair{0, std::numeric_limits<int>::max()}}) {
+        bool rejected = false;
+        try { rgui::SliderInt invalid(0, range.first, range.second); }
+        catch (const std::invalid_argument&) { rejected = true; }
+        expect(rejected);
+    }
+    ImVec2 slider_min{}, slider_max{};
+    auto slider_frame = [&] {
+        ImGui::NewFrame();
+        ImGui::SetNextWindowPos({0, 0});
+        ImGui::SetNextWindowSize({400, 180});
+        ImGui::Begin("integer slider test");
+        slider_tree.draw();
+        slider_min = ImGui::GetItemRectMin();
+        slider_max = ImGui::GetItemRectMax();
+        ImGui::End();
+        ImGui::EndFrame();
+    };
+    slider_frame();
+    slider_frame();
+    ImGui::GetIO().AddMousePosEvent(slider_min.x + (slider_max.x - slider_min.x) * 0.75F,
+                                  (slider_min.y + slider_max.y) * 0.5F);
+    ImGui::GetIO().AddMouseButtonEvent(0, true);
+    slider_frame();
+    expect(edited == -1 && contribution->value() > 60 && contribution->value() < 90 &&
+           slider_tree.pendingEventCount() == 1);
+    const int interaction_value = contribution->value();
+    contribution->setValue(1);
+    expect(slider_tree.flushEvents() == 1 && edited == interaction_value);
+    ImGui::GetIO().AddMousePosEvent(slider_min.x + (slider_max.x - slider_min.x) * 0.5F,
+                                  (slider_min.y + slider_max.y) * 0.5F);
+    slider_frame();
+    expect(slider_tree.pendingEventCount() == 1);
+    slider_tree.setRoot(nullptr);
+    expect(slider_tree.flushEvents() == 0 && edited == interaction_value);
+    ImGui::GetIO().AddMouseButtonEvent(0, false);
 
     ImGui::DestroyContext();
     return failures == 0 ? 0 : 1;

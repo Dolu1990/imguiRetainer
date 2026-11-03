@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -525,11 +526,20 @@ void ScrollArea::setSize(Size size) {
     size_ = size;
 }
 void ScrollArea::setBordered(bool value) noexcept { bordered_ = value; }
+Size ScrollArea::measure() const { return scale_size(size_, layoutScale()); }
+Size ScrollArea::measure(const SizeProposal& proposal) const {
+    Size result = measure();
+    if (proposal.width) result.width = std::max(0.0F, *proposal.width);
+    if (proposal.height) result.height = std::max(0.0F, *proposal.height);
+    return result;
+}
 void ScrollArea::draw() {
+    draw(measure());
+}
+void ScrollArea::draw(Size resolved_size) {
     const std::string area_id = "##rgui-scroll-area-" + std::to_string(id());
-    const Size physical_size = scale_size(size_, layoutScale());
     const ImGuiChildFlags child_flags = bordered_ ? ImGuiChildFlags_Borders : ImGuiChildFlags_None;
-    const bool draw_contents = ImGui::BeginChild(area_id.c_str(), {physical_size.width, physical_size.height},
+    const bool draw_contents = ImGui::BeginChild(area_id.c_str(), {resolved_size.width, resolved_size.height},
                                                  child_flags);
     if (draw_contents) draw_children();
     ImGui::EndChild();
@@ -695,6 +705,31 @@ void Text::draw() {
     }
     if (enabled() && ImGui::IsItemClicked(ImGuiMouseButton_Left)) activate();
 }
+SliderInt::SliderInt(int value, int minimum, int maximum)
+    : value_(value), minimum_(minimum), maximum_(maximum) {
+    // ImGui's integer slider arithmetic requires half-range bounds.
+    if (minimum < std::numeric_limits<int>::min() / 2 ||
+        maximum > std::numeric_limits<int>::max() / 2 || minimum > maximum)
+        throw std::invalid_argument("Invalid integer slider range");
+    setValue(value);
+}
+void SliderInt::setValue(int value) noexcept { value_ = std::clamp(value, minimum_, maximum_); }
+void SliderInt::setOnChange(std::function<void(int)> callback) { on_change_ = std::move(callback); }
+Size SliderInt::measure() const { return {180.0F * layoutScale(), ImGui::GetFrameHeight()}; }
+void SliderInt::draw() {
+    if (!enabled()) ImGui::BeginDisabled();
+    ImGui::SetNextItemWidth(measure().width);
+    const std::string label = "###rgui-" + node_id_string(id_);
+    const bool changed = ImGui::SliderInt(label.c_str(), &value_, minimum_, maximum_, "%d", ImGuiSliderFlags_AlwaysClamp);
+    if (!enabled()) ImGui::EndDisabled();
+    if (changed && enabled() && on_change_ && tree_) {
+        const auto callback = on_change_;
+        const int value = value_;
+        tree_->enqueue_event(weak_from_this(), attachment_generation_,
+            [callback, value](Node&) { callback(value); });
+    }
+}
+
 Button::Button(std::string label) : label_(std::move(label)) {}
 void Button::setLabel(std::string_view value) { label_ = value; }
 void Button::setFontScale(float scale) { validate_font_scale(scale); font_scale_ = scale; }

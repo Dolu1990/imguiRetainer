@@ -413,6 +413,22 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
             });
         },
         "activate", [locked](Text& text) { locked([&] { text.activate(); }); });
+    state.new_usertype<SliderInt>("rgui.SliderInt", sol::no_constructor,
+        sol::base_classes, sol::bases<Node>(),
+        "value", sol::property(
+            [locked](const SliderInt& slider) { return locked([&] { return slider.value(); }); },
+            [locked](SliderInt& slider, int value) { locked([&] { slider.setValue(value); }); }),
+        "onChange", [locked, callbackExecute](SliderInt& slider, sol::function callback) {
+            auto luaCallback = std::make_shared<LuaNodeCallback>(
+                LuaNodeCallback{std::move(callback), callbackExecute});
+            locked([&] {
+                slider.setOnChange([luaCallback](int value) {
+                    sol::state_view lua(luaCallback->function.lua_state());
+                    std::vector<sol::object> args{sol::make_object(lua, value)};
+                    luaCallback->execute(luaCallback->function, args);
+                });
+            });
+        });
     state.new_usertype<Button>("rgui.Button", sol::no_constructor,
         sol::base_classes, sol::bases<Node>(),
         "label", sol::property(
@@ -482,6 +498,9 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
     });
     api.set_function("text", [locked](const std::string& value) {
         return locked([&] { return std::make_shared<Text>(value); });
+    });
+    api.set_function("sliderInt", [locked](int value, int minimum, int maximum) {
+        return locked([&] { return std::make_shared<SliderInt>(value, minimum, maximum); });
     });
     api.set_function("button", [locked](const std::string& label) {
         return locked([&] { return std::make_shared<Button>(label); });

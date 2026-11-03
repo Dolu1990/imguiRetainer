@@ -90,6 +90,7 @@ private:
     friend class Button;
     friend class Selectable;
     friend class Text;
+    friend class SliderInt;
     friend class UiTree;
     virtual void set_tree_recursive(UiTree* tree) noexcept;
     NodeId id_;
@@ -222,7 +223,10 @@ public:
     void setSize(Size size);
     [[nodiscard]] bool bordered() const noexcept { return bordered_; }
     void setBordered(bool value) noexcept;
+    [[nodiscard]] Size measure() const override;
+    [[nodiscard]] Size measure(const SizeProposal& proposal) const override;
     void draw() override;
+    void draw(Size resolved_size) override;
 
 private:
     Size size_;
@@ -354,6 +358,20 @@ private:
     std::function<void(Node&)> on_click_;
 };
 
+/// An integer slider; programmatic assignments clamp without emitting events.
+class SliderInt final : public Node {
+public:
+    SliderInt(int value, int minimum, int maximum);
+    [[nodiscard]] int value() const noexcept { return value_; }
+    void setValue(int value) noexcept;
+    void setOnChange(std::function<void(int)> callback);
+    [[nodiscard]] Size measure() const override;
+    void draw() override;
+private:
+    int value_, minimum_, maximum_;
+    std::function<void(int)> on_change_;
+};
+
 class Button final : public Node {
 public:
     explicit Button(std::string label = {});
@@ -420,6 +438,7 @@ private:
     friend class Container;
     friend class Table;
     friend class Text;
+    friend class SliderInt;
     struct Event {
         std::weak_ptr<Node> target;
         std::uint64_t attachment_generation = 0;

@@ -19,6 +19,16 @@ int main() {
         full_panel = rgui.anchoredPanel("fill", "fill")
         label = rgui.text("Status")
         action = rgui.button("Continue")
+        contribution = rgui.sliderInt(30, 0, 100)
+        assert(contribution.value == 30)
+        contribution.value = 110
+        assert(contribution.value == 100)
+        contribution.value = -1
+        assert(contribution.value == 0)
+        contribution:onChange(function(value) assert(type(value) == "number") end)
+        contribution.enabled = false
+        assert(not contribution.enabled)
+        assert(not pcall(rgui.sliderInt, 0, 10, 1))
         label:setFontScale(2)
         action:setFontScale(2)
         lua_text_font_scale = label:fontScale()
