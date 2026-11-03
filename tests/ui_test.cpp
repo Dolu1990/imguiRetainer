@@ -888,6 +888,17 @@ int main() {
                      (auto_size_viewport->Pos.y + auto_size_viewport->Size.y * 0.5F - 5.0F)) < 1.0F);
     ImGui::EndFrame();
 
+    // A movable auto-sized window keeps its dragged position across draws.
+    auto_size_window->setMovable(true);
+    ImGui::SetWindowPos(auto_size_imgui_window, {30.0F, 40.0F});
+    ImGui::NewFrame();
+    auto_size_window->draw();
+    expect(std::fabs(auto_size_imgui_window->Pos.x - 30.0F) < 1.0F &&
+           std::fabs(auto_size_imgui_window->Pos.y - 40.0F) < 1.0F &&
+           (auto_size_imgui_window->Flags & ImGuiWindowFlags_NoMove) == 0 &&
+           (auto_size_imgui_window->Flags & ImGuiWindowFlags_AlwaysAutoResize) != 0);
+    ImGui::EndFrame();
+
     rgui::UiTree layout_tree;
     expect(layout_tree.layoutScale() == 1.0F);
     for (const float invalid : {0.0F, -1.0F, std::numeric_limits<float>::infinity(),

@@ -101,6 +101,8 @@ positions the window through the primary anchor as a pivot. Both dimensions
 must be automatic together, and automatic sizing cannot use a secondary
 anchor. Window decoration, movement, resizing, and background alpha map to the
 corresponding Dear ImGui window controls.
+Movable auto-sized windows apply their anchor when appearing, then retain the
+user's dragged position. Non-movable auto-sized windows stay anchored each frame.
 
 Button, text, and selectable nodes derive their Dear ImGui item identity from
 their immutable node ID rather than their displayed text. Changing a label or

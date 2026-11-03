@@ -256,7 +256,7 @@ void Window::draw() {
                               viewport->Pos.y + target.y + scale_length(layout.primary.offsetY, scale)};
         if (layout.widthExtent == PanelExtent::automatic) {
             flags |= ImGuiWindowFlags_AlwaysAutoResize;
-            ImGui::SetNextWindowPos(position, ImGuiCond_Always,
+            ImGui::SetNextWindowPos(position, movable_ ? ImGuiCond_Appearing : ImGuiCond_Always,
                                     {layout.primary.self.x, layout.primary.self.y});
         } else {
             Size size = layout.size;
