@@ -534,8 +534,8 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
     api.set_function("text", [locked](const std::string& value) {
         return locked([&] { return std::make_shared<Text>(value); });
     });
-    api.set_function("sliderInt", [locked](int value, int minimum, int maximum) {
-        return locked([&] { return std::make_shared<SliderInt>(value, minimum, maximum); });
+    api.set_function("sliderInt", [locked](int value, int minimum, int maximum, sol::optional<bool> logarithmic) {
+        return locked([&] { return std::make_shared<SliderInt>(value, minimum, maximum, logarithmic.value_or(false)); });
     });
     api.set_function("inputInt", [locked](int value, int minimum, int maximum, sol::optional<int> step) {
         return locked([&] { return std::make_shared<InputInt>(value, minimum, maximum, step.value_or(1)); });

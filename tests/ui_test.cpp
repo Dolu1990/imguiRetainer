@@ -1101,6 +1101,23 @@ int main() {
     expect(slider_tree.flushEvents() == 0 && edited == interaction_value);
     ImGui::GetIO().AddMouseButtonEvent(0, false);
 
+    // Logarithmic credits retain actual values and include the zero endpoint.
+    auto credits = std::make_shared<rgui::SliderInt>(100, 0, 1000, true);
+    slider_tree.setRoot(credits);
+    slider_frame();
+    slider_frame();
+    for (float fraction : {0.0F, 0.5F, 1.0F}) {
+        ImGui::GetIO().AddMousePosEvent(slider_min.x + 1.0F + (slider_max.x - slider_min.x - 2.0F) * fraction,
+                                      (slider_min.y + slider_max.y) * 0.5F);
+        ImGui::GetIO().AddMouseButtonEvent(0, true);
+        slider_frame();
+        if (fraction == 0.0F) expect(credits->value() == 0);
+        else if (fraction == 1.0F) expect(credits->value() == 1000);
+        else expect(credits->value() > 0 && credits->value() < 100);
+        ImGui::GetIO().AddMouseButtonEvent(0, false);
+        slider_frame();
+    }
+
     // Numeric entry clamps user edits and dispatches the captured value at a safe point.
     auto score = std::make_shared<rgui::InputInt>(100, 1, 1000, 100);
     auto map = std::make_shared<rgui::ComboBox>(std::vector<std::string>{"Open", "Wrecks"}, 0);

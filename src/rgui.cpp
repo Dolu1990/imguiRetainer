@@ -705,8 +705,8 @@ void Text::draw() {
     }
     if (enabled() && ImGui::IsItemClicked(ImGuiMouseButton_Left)) activate();
 }
-SliderInt::SliderInt(int value, int minimum, int maximum)
-    : value_(value), minimum_(minimum), maximum_(maximum) {
+SliderInt::SliderInt(int value, int minimum, int maximum, bool logarithmic)
+    : value_(value), minimum_(minimum), maximum_(maximum), logarithmic_(logarithmic) {
     // ImGui's integer slider arithmetic requires half-range bounds.
     if (minimum < std::numeric_limits<int>::min() / 2 ||
         maximum > std::numeric_limits<int>::max() / 2 || minimum > maximum)
@@ -720,7 +720,8 @@ void SliderInt::draw() {
     if (!enabled()) ImGui::BeginDisabled();
     ImGui::SetNextItemWidth(measure().width);
     const std::string label = "###rgui-" + node_id_string(id_);
-    const bool changed = ImGui::SliderInt(label.c_str(), &value_, minimum_, maximum_, "%d", ImGuiSliderFlags_AlwaysClamp);
+    const auto flags = ImGuiSliderFlags_AlwaysClamp | (logarithmic_ ? ImGuiSliderFlags_Logarithmic : ImGuiSliderFlags_None);
+    const bool changed = ImGui::SliderInt(label.c_str(), &value_, minimum_, maximum_, "%d", flags);
     if (!enabled()) ImGui::EndDisabled();
     if (changed && enabled() && on_change_ && tree_) {
         const auto callback = on_change_;

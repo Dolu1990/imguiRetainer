@@ -363,7 +363,7 @@ private:
 /// An integer slider; programmatic assignments clamp without emitting events.
 class SliderInt final : public Node {
 public:
-    SliderInt(int value, int minimum, int maximum);
+    SliderInt(int value, int minimum, int maximum, bool logarithmic = false);
     [[nodiscard]] int value() const noexcept { return value_; }
     void setValue(int value) noexcept;
     void setOnChange(std::function<void(int)> callback);
@@ -371,6 +371,7 @@ public:
     void draw() override;
 private:
     int value_, minimum_, maximum_;
+    bool logarithmic_;
     std::function<void(int)> on_change_;
 };
 

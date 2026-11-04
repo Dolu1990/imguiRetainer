@@ -19,6 +19,11 @@ int main() {
         full_panel = rgui.anchoredPanel("fill", "fill")
         label = rgui.text("Status")
         action = rgui.button("Continue")
+        credits = rgui.sliderInt(100, 0, 1000, true)
+        credits.value = 0
+        assert(credits.value == 0)
+        credits.value = 2000
+        assert(credits.value == 1000)
         contribution = rgui.sliderInt(30, 0, 100)
         assert(contribution.value == 30)
         contribution.value = 110

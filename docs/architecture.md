@@ -116,7 +116,9 @@ embedding application. Structural changes, including container edits and table
 row/cell edits, are not permitted while `UiTree::draw()` is running.
 
 `SliderInt` provides bounded integer editing with a visible numeric value. Its
-range is immutable and limited to ImGui's signed half-range bounds. Programmatic
+range is immutable and limited to ImGui's signed half-range bounds. An optional
+constructor boolean enables logarithmic dragging, including zero endpoints; it
+defaults to false. Ctrl-click retains ImGui's exact numeric entry. Programmatic
 value assignment clamps without emitting an event. User changes queue the value
 at the time of interaction through the same attachment-aware event mechanism;
 Lua `onChange(callback)` receives that integer at the embedding's safe point.
