@@ -12,7 +12,7 @@ state.
 - Public target: `rgui::rgui`
 - Core public headers: `<rgui/rgui.hpp>` and `<rgui/ui.hpp>`; the optional
   binding target additionally exposes `<rgui/lua.hpp>`.
-- Retained nodes: `Window`, `Stack`, `Table`, `ScrollArea`, `AnchoredPanel`, `Text`, `Button`, `SliderInt`, and `Selectable`
+- Retained nodes: `Window`, `Stack`, `Table`, `ScrollArea`, `AnchoredPanel`, `Text`, `Button`, `SliderInt`, `InputInt`, `ComboBox`, `Separator`, and `Selectable`
 - `Window` supports normal ImGui placement or anchored main-viewport layout,
   including fixed, fill, and content-sized extents, along with decoration,
   movement, resizing, and background-alpha controls.
@@ -120,6 +120,18 @@ range is immutable and limited to ImGui's signed half-range bounds. Programmatic
 value assignment clamps without emitting an event. User changes queue the value
 at the time of interaction through the same attachment-aware event mechanism;
 Lua `onChange(callback)` receives that integer at the embedding's safe point.
+
+`InputInt` provides decimal integer entry with step buttons (1 normally, 10 with
+Ctrl), bounded to an immutable range within ImGui's signed half-range. Values
+clamp on assignment and user edits. `ComboBox` owns immutable nonempty option
+labels and a selected index (zero-based in C++, one-based in Lua). Invalid
+selections throw rather than silently changing selection. Their `onChange`
+callbacks capture the edited value and use the same attachment-aware deferred
+event queue as `SliderInt`; programmatic assignments never emit events. Both
+honor `enabled`, and fixed widths follow the tree's layout scale. `Separator`
+draws a horizontal divider across the available content width. Small exclusive
+selection groups can use existing `Selectable` nodes in table columns instead
+of requiring a separate segmented-control node.
 
 `bindLua` receives an embedding-owned `std::recursive_mutex`. It serializes all
 Lua-exposed rgui object access with the embedding application's draw and event

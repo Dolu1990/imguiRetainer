@@ -429,6 +429,41 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
                 });
             });
         });
+    state.new_usertype<InputInt>("rgui.InputInt", sol::no_constructor,
+        sol::base_classes, sol::bases<Node>(),
+        "value", sol::property(
+            [locked](const InputInt& input) { return locked([&] { return input.value(); }); },
+            [locked](InputInt& input, int value) { locked([&] { input.setValue(value); }); }),
+        "onChange", [locked, callbackExecute](InputInt& input, sol::function callback) {
+            auto luaCallback = std::make_shared<LuaNodeCallback>(LuaNodeCallback{std::move(callback), callbackExecute});
+            locked([&] {
+                input.setOnChange([luaCallback](int value) {
+                    sol::state_view lua(luaCallback->function.lua_state());
+                    std::vector<sol::object> args{sol::make_object(lua, value)};
+                    luaCallback->execute(luaCallback->function, args);
+                });
+            });
+        });
+    state.new_usertype<ComboBox>("rgui.ComboBox", sol::no_constructor,
+        sol::base_classes, sol::bases<Node>(),
+        "selected", sol::property(
+            [locked](const ComboBox& combo) { return locked([&] { return combo.selected() + 1; }); },
+            [locked](ComboBox& combo, int value) {
+                if (value < 1) throw std::out_of_range("Combo box selection is one-based");
+                locked([&] { combo.setSelected(value - 1); });
+            }),
+        "onChange", [locked, callbackExecute](ComboBox& combo, sol::function callback) {
+            auto luaCallback = std::make_shared<LuaNodeCallback>(LuaNodeCallback{std::move(callback), callbackExecute});
+            locked([&] {
+                combo.setOnChange([luaCallback](int index) {
+                    sol::state_view lua(luaCallback->function.lua_state());
+                    std::vector<sol::object> args{sol::make_object(lua, index + 1)};
+                    luaCallback->execute(luaCallback->function, args);
+                });
+            });
+        });
+    state.new_usertype<Separator>("rgui.Separator", sol::no_constructor,
+        sol::base_classes, sol::bases<Node>());
     state.new_usertype<Button>("rgui.Button", sol::no_constructor,
         sol::base_classes, sol::bases<Node>(),
         "label", sol::property(
@@ -501,6 +536,22 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
     });
     api.set_function("sliderInt", [locked](int value, int minimum, int maximum) {
         return locked([&] { return std::make_shared<SliderInt>(value, minimum, maximum); });
+    });
+    api.set_function("inputInt", [locked](int value, int minimum, int maximum) {
+        return locked([&] { return std::make_shared<InputInt>(value, minimum, maximum); });
+    });
+    api.set_function("comboBox", [locked](sol::table options, int selected) {
+        if (selected < 1) throw std::out_of_range("Combo box selection is one-based");
+        return locked([&] {
+            std::vector<std::string> labels;
+            labels.reserve(options.size());
+            for (std::size_t index = 1; index <= options.size(); ++index)
+                labels.push_back(options.get<std::string>(index));
+            return std::make_shared<ComboBox>(std::move(labels), selected - 1);
+        });
+    });
+    api.set_function("separator", [locked] {
+        return locked([] { return std::make_shared<Separator>(); });
     });
     api.set_function("button", [locked](const std::string& label) {
         return locked([&] { return std::make_shared<Button>(label); });

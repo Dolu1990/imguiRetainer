@@ -6,13 +6,20 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <iostream>
+#include <source_location>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
 
 namespace {
 int failures = 0;
-void expect(bool condition) { if (!condition) ++failures; }
+void expect(bool condition, std::source_location location = std::source_location::current()) {
+    if (!condition) {
+        ++failures;
+        std::cerr << "Failed expectation at line " << location.line() << '\n';
+    }
+}
 class CustomNode final : public rgui::Node {
 public:
     void draw() override { ImGui::TextUnformatted("custom node"); }
@@ -1093,6 +1100,71 @@ int main() {
     slider_tree.setRoot(nullptr);
     expect(slider_tree.flushEvents() == 0 && edited == interaction_value);
     ImGui::GetIO().AddMouseButtonEvent(0, false);
+
+    // Numeric entry clamps user edits and dispatches the captured value at a safe point.
+    auto score = std::make_shared<rgui::InputInt>(100, 1, 1000);
+    auto map = std::make_shared<rgui::ComboBox>(std::vector<std::string>{"Open", "Wrecks"}, 0);
+    rgui::UiTree editor_tree;
+    int edited_score = -1, edited_map = -1;
+    score->setOnChange([&](int value) { edited_score = value; });
+    map->setOnChange([&](int value) { edited_map = value; });
+    editor_tree.setRoot(score);
+    ImVec2 editor_min{}, editor_max{};
+    auto editor_frame = [&] {
+        ImGui::NewFrame();
+        ImGui::SetNextWindowPos({0, 0});
+        ImGui::SetNextWindowSize({400, 180});
+        ImGui::Begin("setup editor test");
+        editor_tree.draw();
+        editor_min = ImGui::GetItemRectMin();
+        editor_max = ImGui::GetItemRectMax();
+        ImGui::End();
+        ImGui::EndFrame();
+    };
+    editor_frame(); editor_frame();
+    ImGui::GetIO().AddMousePosEvent(editor_min.x + 20, (editor_min.y + editor_max.y) / 2);
+    ImGui::GetIO().AddMouseButtonEvent(0, true);
+    editor_frame();
+    ImGui::GetIO().AddMouseButtonEvent(0, false);
+    editor_frame();
+    ImGui::GetIO().AddMouseButtonEvent(0, true);
+    editor_frame();
+    ImGui::GetIO().AddMouseButtonEvent(0, false);
+    editor_frame();
+    ImGui::GetIO().AddKeyEvent(ImGuiMod_Ctrl, true);
+    ImGui::GetIO().AddKeyEvent(ImGuiKey_A, true);
+    editor_frame();
+    ImGui::GetIO().AddKeyEvent(ImGuiKey_A, false);
+    ImGui::GetIO().AddKeyEvent(ImGuiMod_Ctrl, false);
+    ImGui::GetIO().AddInputCharactersUTF8("9999");
+    editor_frame();
+    editor_frame();
+    expect(score->value() == 1000 && edited_score == -1);
+    score->setValue(10);
+    expect(editor_tree.flushEvents() >= 1 && edited_score == 1000);
+    editor_tree.setRoot(map);
+    editor_frame(); editor_frame();
+    ImGui::GetIO().AddMousePosEvent(editor_max.x - 10, (editor_min.y + editor_max.y) / 2);
+    ImGui::GetIO().AddMouseButtonEvent(0, true);
+    editor_frame();
+    ImGui::GetIO().AddMouseButtonEvent(0, false);
+    editor_frame();
+    editor_frame();
+    ImGuiWindow* popup = GImGui->OpenPopupStack.empty() ? nullptr : GImGui->OpenPopupStack.back().Window;
+    expect(popup != nullptr);
+    if (popup) {
+        ImGui::GetIO().AddMousePosEvent(popup->WorkRect.Min.x + 20,
+            popup->WorkRect.Min.y + ImGui::GetTextLineHeightWithSpacing() * 1.5F);
+        ImGui::GetIO().AddMouseButtonEvent(0, true);
+        editor_frame();
+        ImGui::GetIO().AddMouseButtonEvent(0, false);
+        editor_frame();
+        expect(map->selected() == 1 && edited_map == -1);
+        map->setSelected(0);
+        expect(editor_tree.flushEvents() == 1 && edited_map == 1);
+    }
+    editor_tree.setRoot(std::make_shared<rgui::Separator>());
+    editor_frame();
 
     ImGui::DestroyContext();
     return failures == 0 ? 0 : 1;

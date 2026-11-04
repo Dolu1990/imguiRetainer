@@ -29,6 +29,25 @@ int main() {
         contribution.enabled = false
         assert(not contribution.enabled)
         assert(not pcall(rgui.sliderInt, 0, 10, 1))
+        score = rgui.inputInt(100, 1, 1000000)
+        score.value = 0
+        assert(score.value == 1)
+        score.value = 2000000
+        assert(score.value == 1000000)
+        score:onChange(function(value) assert(type(value) == "number") end)
+        assert(not pcall(rgui.inputInt, 0, 5, 1))
+        map = rgui.comboBox({"Open", "Wrecks"}, 2)
+        assert(map.selected == 2)
+        map.selected = 1
+        assert(map.selected == 1)
+        assert(not pcall(function() map.selected = 0 end))
+        assert(not pcall(function() map.selected = 3 end))
+        assert(not pcall(rgui.comboBox, {}, 1))
+        map:onChange(function(index) assert(index >= 1 and index <= 2) end)
+        widgets = rgui.stack("vertical")
+        widgets:append(score)
+        widgets:append(map)
+        widgets:append(rgui.separator())
         label:setFontScale(2)
         action:setFontScale(2)
         lua_text_font_scale = label:fontScale()

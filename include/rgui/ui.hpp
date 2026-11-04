@@ -91,6 +91,8 @@ private:
     friend class Selectable;
     friend class Text;
     friend class SliderInt;
+    friend class InputInt;
+    friend class ComboBox;
     friend class UiTree;
     virtual void set_tree_recursive(UiTree* tree) noexcept;
     NodeId id_;
@@ -372,6 +374,41 @@ private:
     std::function<void(int)> on_change_;
 };
 
+/// Bounded numeric entry with single-step buttons; assignments do not emit events.
+class InputInt final : public Node {
+public:
+    InputInt(int value, int minimum, int maximum);
+    [[nodiscard]] int value() const noexcept { return value_; }
+    void setValue(int value) noexcept;
+    void setOnChange(std::function<void(int)> callback);
+    [[nodiscard]] Size measure() const override;
+    void draw() override;
+private:
+    int value_, minimum_, maximum_;
+    std::function<void(int)> on_change_;
+};
+
+/// Immutable options, with a zero-based selected index in C++.
+class ComboBox final : public Node {
+public:
+    ComboBox(std::vector<std::string> options, int selected);
+    [[nodiscard]] int selected() const noexcept { return selected_; }
+    void setSelected(int selected);
+    void setOnChange(std::function<void(int)> callback);
+    [[nodiscard]] Size measure() const override;
+    void draw() override;
+private:
+    std::vector<std::string> options_;
+    int selected_;
+    std::function<void(int)> on_change_;
+};
+
+class Separator final : public Node {
+public:
+    [[nodiscard]] Size measure() const override;
+    void draw() override;
+};
+
 class Button final : public Node {
 public:
     explicit Button(std::string label = {});
@@ -439,6 +476,8 @@ private:
     friend class Table;
     friend class Text;
     friend class SliderInt;
+    friend class InputInt;
+    friend class ComboBox;
     struct Event {
         std::weak_ptr<Node> target;
         std::uint64_t attachment_generation = 0;

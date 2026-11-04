@@ -730,6 +730,75 @@ void SliderInt::draw() {
     }
 }
 
+InputInt::InputInt(int value, int minimum, int maximum)
+    : value_(value), minimum_(minimum), maximum_(maximum) {
+    if (minimum > maximum || minimum < std::numeric_limits<int>::min() / 2 ||
+        maximum > std::numeric_limits<int>::max() / 2)
+        throw std::invalid_argument("Invalid integer input range");
+    setValue(value);
+}
+void InputInt::setValue(int value) noexcept { value_ = std::clamp(value, minimum_, maximum_); }
+void InputInt::setOnChange(std::function<void(int)> callback) { on_change_ = std::move(callback); }
+Size InputInt::measure() const { return {240.0F * layoutScale(), ImGui::GetFrameHeight()}; }
+void InputInt::draw() {
+    if (!enabled()) ImGui::BeginDisabled();
+    ImGui::SetNextItemWidth(measure().width);
+    const std::string label = "###rgui-" + node_id_string(id_);
+    const bool changed = ImGui::InputInt(label.c_str(), &value_, 1, 10, ImGuiInputTextFlags_CharsDecimal);
+    if (!enabled()) ImGui::EndDisabled();
+    setValue(value_);
+    if (changed && enabled() && on_change_ && tree_) {
+        const auto callback = on_change_;
+        const int value = value_;
+        tree_->enqueue_event(weak_from_this(), attachment_generation_,
+            [callback, value](Node&) { callback(value); });
+    }
+}
+
+ComboBox::ComboBox(std::vector<std::string> options, int selected) : options_(std::move(options)) {
+    if (options_.empty() || options_.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+        throw std::invalid_argument("Combo box requires a nonempty list of options");
+    setSelected(selected);
+}
+void ComboBox::setSelected(int selected) {
+    if (selected < 0 || static_cast<std::size_t>(selected) >= options_.size())
+        throw std::out_of_range("Combo box selection out of range");
+    selected_ = selected;
+}
+void ComboBox::setOnChange(std::function<void(int)> callback) { on_change_ = std::move(callback); }
+Size ComboBox::measure() const {
+    float width = 240.0F * layoutScale();
+    for (const auto& option : options_)
+        width = std::max(width, ImGui::CalcTextSize(option.c_str()).x + ImGui::GetFrameHeight() +
+                               2 * ImGui::GetStyle().FramePadding.x);
+    return {width, ImGui::GetFrameHeight()};
+}
+void ComboBox::draw() {
+    if (!enabled()) ImGui::BeginDisabled();
+    ImGui::SetNextItemWidth(measure().width);
+    const std::string label = "###rgui-" + node_id_string(id_);
+    if (ImGui::BeginCombo(label.c_str(), options_[selected_].c_str())) {
+        for (int index = 0; index < static_cast<int>(options_.size()); ++index) {
+            ImGui::PushID(index);
+            if (ImGui::Selectable(options_[index].c_str(), index == selected_) && enabled()) {
+                selected_ = index;
+                if (on_change_ && tree_) {
+                    const auto callback = on_change_;
+                    tree_->enqueue_event(weak_from_this(), attachment_generation_,
+                        [callback, index](Node&) { callback(index); });
+                }
+            }
+            if (index == selected_) ImGui::SetItemDefaultFocus();
+            ImGui::PopID();
+        }
+        ImGui::EndCombo();
+    }
+    if (!enabled()) ImGui::EndDisabled();
+}
+
+Size Separator::measure() const { return {0.0F, 1.0F}; }
+void Separator::draw() { ImGui::Separator(); }
+
 Button::Button(std::string label) : label_(std::move(label)) {}
 void Button::setLabel(std::string_view value) { label_ = value; }
 void Button::setFontScale(float scale) { validate_font_scale(scale); font_scale_ = scale; }
