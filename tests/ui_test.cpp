@@ -1102,7 +1102,7 @@ int main() {
     ImGui::GetIO().AddMouseButtonEvent(0, false);
 
     // Numeric entry clamps user edits and dispatches the captured value at a safe point.
-    auto score = std::make_shared<rgui::InputInt>(100, 1, 1000);
+    auto score = std::make_shared<rgui::InputInt>(100, 1, 1000, 100);
     auto map = std::make_shared<rgui::ComboBox>(std::vector<std::string>{"Open", "Wrecks"}, 0);
     rgui::UiTree editor_tree;
     int edited_score = -1, edited_map = -1;
@@ -1122,6 +1122,23 @@ int main() {
         ImGui::EndFrame();
     };
     editor_frame(); editor_frame();
+    // The rightmost button increments by the configured amount; the next decrements.
+    ImGui::GetIO().AddMousePosEvent(editor_max.x - 5, (editor_min.y + editor_max.y) / 2);
+    ImGui::GetIO().AddMouseButtonEvent(0, true);
+    editor_frame();
+    ImGui::GetIO().AddMouseButtonEvent(0, false);
+    editor_frame();
+    expect(score->value() == 200);
+    expect(editor_tree.flushEvents() == 1 && edited_score == 200);
+    ImGui::GetIO().AddMousePosEvent(editor_max.x - ImGui::GetFrameHeight() - ImGui::GetStyle().ItemInnerSpacing.x - 5,
+                                  (editor_min.y + editor_max.y) / 2);
+    ImGui::GetIO().AddMouseButtonEvent(0, true);
+    editor_frame();
+    ImGui::GetIO().AddMouseButtonEvent(0, false);
+    editor_frame();
+    expect(score->value() == 100);
+    expect(editor_tree.flushEvents() == 1 && edited_score == 100);
+    edited_score = -1;
     ImGui::GetIO().AddMousePosEvent(editor_min.x + 20, (editor_min.y + editor_max.y) / 2);
     ImGui::GetIO().AddMouseButtonEvent(0, true);
     editor_frame();

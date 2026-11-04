@@ -121,8 +121,10 @@ value assignment clamps without emitting an event. User changes queue the value
 at the time of interaction through the same attachment-aware event mechanism;
 Lua `onChange(callback)` receives that integer at the embedding's safe point.
 
-`InputInt` provides decimal integer entry with step buttons (1 normally, 10 with
-Ctrl), bounded to an immutable range within ImGui's signed half-range. Values
+`InputInt` provides decimal integer entry with a configurable positive step
+(default 1, multiplied by 10 with Ctrl), bounded to an immutable range within
+ImGui's signed half-range. The step is at most INT_MAX/20 to keep fast-step
+arithmetic within range. Values
 clamp on assignment and user edits. `ComboBox` owns immutable nonempty option
 labels and a selected index (zero-based in C++, one-based in Lua). Invalid
 selections throw rather than silently changing selection. Their `onChange`

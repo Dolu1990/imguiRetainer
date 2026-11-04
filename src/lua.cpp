@@ -537,8 +537,8 @@ void bindLua(sol::state_view state, std::recursive_mutex& mutex,
     api.set_function("sliderInt", [locked](int value, int minimum, int maximum) {
         return locked([&] { return std::make_shared<SliderInt>(value, minimum, maximum); });
     });
-    api.set_function("inputInt", [locked](int value, int minimum, int maximum) {
-        return locked([&] { return std::make_shared<InputInt>(value, minimum, maximum); });
+    api.set_function("inputInt", [locked](int value, int minimum, int maximum, sol::optional<int> step) {
+        return locked([&] { return std::make_shared<InputInt>(value, minimum, maximum, step.value_or(1)); });
     });
     api.set_function("comboBox", [locked](sol::table options, int selected) {
         if (selected < 1) throw std::out_of_range("Combo box selection is one-based");

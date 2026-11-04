@@ -730,11 +730,13 @@ void SliderInt::draw() {
     }
 }
 
-InputInt::InputInt(int value, int minimum, int maximum)
-    : value_(value), minimum_(minimum), maximum_(maximum) {
+InputInt::InputInt(int value, int minimum, int maximum, int step)
+    : value_(value), minimum_(minimum), maximum_(maximum), step_(step) {
     if (minimum > maximum || minimum < std::numeric_limits<int>::min() / 2 ||
         maximum > std::numeric_limits<int>::max() / 2)
         throw std::invalid_argument("Invalid integer input range");
+    if (step < 1 || step > std::numeric_limits<int>::max() / 20)
+        throw std::invalid_argument("Invalid integer input step");
     setValue(value);
 }
 void InputInt::setValue(int value) noexcept { value_ = std::clamp(value, minimum_, maximum_); }
@@ -744,7 +746,7 @@ void InputInt::draw() {
     if (!enabled()) ImGui::BeginDisabled();
     ImGui::SetNextItemWidth(measure().width);
     const std::string label = "###rgui-" + node_id_string(id_);
-    const bool changed = ImGui::InputInt(label.c_str(), &value_, 1, 10, ImGuiInputTextFlags_CharsDecimal);
+    const bool changed = ImGui::InputInt(label.c_str(), &value_, step_, step_ * 10, ImGuiInputTextFlags_CharsDecimal);
     if (!enabled()) ImGui::EndDisabled();
     setValue(value_);
     if (changed && enabled() && on_change_ && tree_) {

@@ -374,17 +374,17 @@ private:
     std::function<void(int)> on_change_;
 };
 
-/// Bounded numeric entry with single-step buttons; assignments do not emit events.
+/// Bounded numeric entry with configurable step buttons; assignments do not emit events.
 class InputInt final : public Node {
 public:
-    InputInt(int value, int minimum, int maximum);
+    InputInt(int value, int minimum, int maximum, int step = 1);
     [[nodiscard]] int value() const noexcept { return value_; }
     void setValue(int value) noexcept;
     void setOnChange(std::function<void(int)> callback);
     [[nodiscard]] Size measure() const override;
     void draw() override;
 private:
-    int value_, minimum_, maximum_;
+    int value_, minimum_, maximum_, step_;
     std::function<void(int)> on_change_;
 };
 

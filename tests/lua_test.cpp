@@ -29,13 +29,14 @@ int main() {
         contribution.enabled = false
         assert(not contribution.enabled)
         assert(not pcall(rgui.sliderInt, 0, 10, 1))
-        score = rgui.inputInt(100, 1, 1000000)
+        score = rgui.inputInt(100, 1, 1000000, 100)
         score.value = 0
         assert(score.value == 1)
         score.value = 2000000
         assert(score.value == 1000000)
         score:onChange(function(value) assert(type(value) == "number") end)
         assert(not pcall(rgui.inputInt, 0, 5, 1))
+        assert(not pcall(rgui.inputInt, 100, 1, 1000000, 0))
         map = rgui.comboBox({"Open", "Wrecks"}, 2)
         assert(map.selected == 2)
         map.selected = 1
